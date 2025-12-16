@@ -23,6 +23,7 @@ app.get('/config', (req, res) => {
 });
 
 app.post('/config', (req, res) => {
+  console.log("<h1>Impostazioni</h1>")
   console.log("Dati ricevuti:", req.body);
   fs.writeFileSync(path, JSON.stringify(req.body, null, 4));
   res.sendStatus(200);

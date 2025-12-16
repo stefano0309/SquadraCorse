@@ -1,39 +1,68 @@
 import { useState, useEffect } from 'react';
 import './style.css';
+import React from 'react';
 
 export default function App() {
-  const [selector, setSelector] = useState(false); // false = volante, true = controller
+  const [selector, setSelector] = useState(false);
   const [gamepad, setGamepad] = useState(null);
   const [vel, setVel] = useState(50);
+  const [buttons, setButtons] = useState([])
 
-  // Gestione checkbox
+
   function handleChange(event) {
     const checked = event.target.checked;
     setSelector(checked);
-    sendGamepadData(gamepad, checked);
+    sendGamepadData(undefined, checked);
   }
 
-  // Invio dati al backend
-  function sendGamepadData(gp, currentSelector = selector) {
+  function btn() {
+    const gp = navigator.getGamepads()[0];
+
+    if (gp) {
+      setGamepad(gp); // aggiorna lo state
+      setButtons(
+        gp.buttons.map(b => ({
+          pressed: b.pressed,
+          value: b.value
+        }))
+      );
+    }
+
+    requestAnimationFrame(btn);
+  }
+
+
+  useEffect(() => {
+    btn()
+  }, [])
+
+
+  function sendGamepadData(gp = gamepad, currentSelector = selector, currentSpeed = vel) {
     const data = gp
       ? {
-          Setting: {
-            type: !currentSelector ? "controller" : "volante",
-            index: gp.index,
-            id: gp.id,
-            buttons: gp.buttons.length,
-            axes: gp.axes.length,
-          },
+        Envirioment: {
+          maxSpeed: currentSpeed
+        },
+        Setting: {
+          mode: currentSelector ? "controller" : "volante",
+          index: gp.index,
+          id: gp.id,
+          buttons: gp.buttons.length,
+          axes: gp.axes.length,
         }
+      }
       : {
-          Setting: {
-            type: !currentSelector ? "controller" : "volante",
-            index: null,
-            id: null,
-            buttons: null,
-            axes: null,
-          },
-        };
+        Envirioment: {
+          maxSpeed: currentSpeed
+        },
+        Setting: {
+          model: currentSelector ? "controller" : "volante",
+          index: null,
+          id: null,
+          buttons: null,
+          axes: null,
+        },
+      };
 
     console.log("Dati inviati al backend:", data);
 
@@ -45,6 +74,7 @@ export default function App() {
       .then(res => res.ok ? console.log("POST riuscita") : console.error("Errore invio dati"))
       .catch(err => console.error("Errore fetch:", err));
   }
+
 
   // Gestione gamepad connesso
   useEffect(() => {
@@ -102,31 +132,55 @@ export default function App() {
 
           <div className="inputSelection">
             <label htmlFor="velSlider">Velocità massima:</label>
-            <input 
-              type="range" 
+            <input
+              type="range"
               id="velSlider"
               min="1"
               max="100"
               value={vel}
-              onChange={(e) => setVel(e.target.value)}
+              onChange={(e) => {
+                const newVel = e.target.value;
+                setVel(newVel);
+                sendGamepadData(undefined, undefined, newVel);
+              }}
             />
             <h3>{vel}</h3>
           </div>
         </form>
       </section>
-
-      <section id='map'>
+      <section id='mapping'>
         {gamepad ? (
           <>
             <p><strong>Index:</strong> {gamepad.index}</p>
             <p><strong>ID:</strong> {gamepad.id}</p>
             <p><strong>Bottoni:</strong> {gamepad.buttons.length}</p>
             <p><strong>Assi:</strong> {gamepad.axes.length}</p>
+            <div id="map">
+              <div>
+                <h3>CREA UNA CONFIGURAZIONE</h3>
+                {buttons.map((btn, index) => (
+                  <p key={index} className='p-mapping'>
+                    <strong>Button ID {index}:</strong>{" "}
+                    {btn.pressed ? "PREMUTO" : "RILASCIATO"}{" "}
+                    <strong>Value:</strong>{"  "}
+                    <input
+                      type="text"
+                      className="button-mapping"
+                    />
+                  </p>
+                ))}
+              </div>
+              <div>
+                <h3>CARICA UNA CONFIGURAZIONE</h3>
+                <textarea id="text-area" placeholder="Scrivi qui..."></textarea>
+              </div>
+            </div>
+
           </>
         ) : (
           <p>{selector ? "Collega un controller" : "Collega un volante"}</p>
         )}
       </section>
     </>
-  );
+  )
 }
