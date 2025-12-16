@@ -1,0 +1,3 @@
+Il modulo che viene poi richiamato `Controller.py` contiene una classe chiamata `PS4Controller` utilizzando il metodo init andiamo a definire l'esistenza del file di mappatura se non esiste andiamo a crearlo seguendo l'ordine altrimenti carica la mappatura che restituisce una stringa di conferma dopo aver caricato la mappatura 
+
+Poi vengono Indicati i metodi per ottenere i tasti tramite una funzione di update principalmente per gli assi

@@ -1,0 +1,217 @@
+{
+  "main": {
+    "id": "ac637e4327956b86",
+    "type": "split",
+    "children": [
+      {
+        "id": "ad6edfdf3d7d6a70",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "5eeba2ece4c9d623",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Progetto2/ListaMateriali.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "ListaMateriali"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "ba35a2771ac9b8d9",
+    "type": "split",
+    "children": [
+      {
+        "id": "febe863a1af2018a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "f691efcc6a68ae6a",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "983d0b8b40e32e1e",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "081bd74ef5a0dc31",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "28ab397dd260ddbb",
+    "type": "split",
+    "children": [
+      {
+        "id": "d3ff87ae43c0d4f4",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "f7b8313b9b9f127f",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Progetto attuale.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for Progetto attuale"
+            }
+          },
+          {
+            "id": "8d070c72bfc7bbe5",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Progetto attuale.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from Progetto attuale"
+            }
+          },
+          {
+            "id": "653de5bb812b47ec",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "e038bf367394e3f4",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "4ec91e8bf4716c0e",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Progetto attuale.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of Progetto attuale"
+            }
+          },
+          {
+            "id": "a34b06d9c103804d",
+            "type": "leaf",
+            "state": {
+              "type": "footnotes",
+              "state": {
+                "file": "Progetto attuale.md"
+              },
+              "icon": "lucide-file-signature",
+              "title": "Footnotes"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false,
+      "markdown-importer:Open format converter": false,
+      "random-note:Open random note": false
+    }
+  },
+  "active": "5eeba2ece4c9d623",
+  "lastOpenFiles": [
+    "Progetto2/ListaMateriali.pdf",
+    "Progetto2/Collegamento via radio con raspeberry pi e computer.md",
+    "Progetto2/Pasted image 20251209091044.png",
+    "Progetto2/Progetto 2 introduzione.md",
+    "Progetto1/20251126_182754.jpg",
+    "Progetto1/Ping Client.md",
+    "Progetto1/ping_monitor.pdf",
+    "Progetto1/Controller Gui.md",
+    "Progetto1/Py Client.md",
+    "Progetto1/Progetto attuale.md",
+    "Progetto1/Configurazione controller.md",
+    "Progetto1/Classe controller.md",
+    "Progetto2",
+    "Progetto1"
+  ]
+}
