@@ -56,6 +56,18 @@ export default function App() {
   //- Manualmente quindi mappatura dagli input 
   //- Caricare mappatura quindi il testo dell'area text
 
+  function sendMap(gp) {
+    const data = {}
+
+    fetch('http://localhost:3000/map', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+      .then(res => res.ok ? console.log("POST riuscita") : console.error("Errore invio dati"))
+      .catch(err => console.error("Errore fetch:", err));
+  }
+
   function sendGamepadData(gp = gamepad, currentSelector = selector, currentSpeed = vel) {
     const data = gp
       ? {
@@ -102,6 +114,7 @@ export default function App() {
       console.log("Gamepad connesso:", gp);
       setGamepad(gp);
       sendGamepadData(gp);
+      sendMap(gp);
     }
 
     window.addEventListener("gamepadconnected", handleGamepadConnected);
@@ -193,7 +206,7 @@ export default function App() {
                 {axes.map((value, index) => (
                   <p key={index} className="p-mapping">
                     <strong>ASSE ID {index}:</strong>{" "}
-                    {value.toFixed(2)}
+                    {value.toFixed(1)}
                     <strong> Value:</strong>{" "}
                     <input
                       type="text"
@@ -206,6 +219,9 @@ export default function App() {
               <div>
                 <h3>CARICA UNA CONFIGURAZIONE</h3>
                 <textarea id="text-area" placeholder="Scrivi qui..."></textarea>
+              </div>
+              <div>
+                <button onClick={sendMap}>Invia mappatura</button>
               </div>
             </div>
 

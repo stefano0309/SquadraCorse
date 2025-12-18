@@ -1,0 +1,12 @@
+{
+    "Envirioment": {
+        "maxSpeed": 50
+    },
+    "Setting": {
+        "model": "controller",
+        "index": null,
+        "id": null,
+        "buttons": null,
+        "axes": null
+    }
+}
