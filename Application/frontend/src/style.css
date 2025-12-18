@@ -157,3 +157,46 @@ input:checked+.slider:before {
 .slider.round:before {
   border-radius: 50%;
 }
+
+.wrapper{
+  height: 90vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-form{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  color: black;
+  background-color: white;
+  box-shadow: 0 0 10px black;
+  width: 400px;
+  height: 300px;
+  padding: 15px;
+  border-radius: 12px;
+}
+
+.login-form input{
+  width: 300px;
+  border: none;
+  padding: 10px;
+  box-shadow: 0 0 2px black;
+  border-radius: 12px;
+  margin: 10px;
+}
+
+.login-form button{
+  width: 300px;
+  border: none;
+  padding: 10px;
+  box-shadow: 0 0 2px black;
+  border-radius: 24px;
+  margin: 10px;
+}
+.login-form label{
+  width: 300px;
+  text-align: left;
+}
