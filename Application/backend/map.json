@@ -3,7 +3,7 @@
         "maxSpeed": 50
     },
     "Setting": {
-        "mode": "controller",
+        "mode": "volante",
         "index": 0,
         "id": "Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 09cc)",
         "buttons": 18,

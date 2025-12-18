@@ -7,7 +7,7 @@ export default function App() {
   const [gamepad, setGamepad] = useState(null);
   const [vel, setVel] = useState(50);
   const [buttons, setButtons] = useState([])
-
+  const [axes, setAxes] = useState([])
 
   function handleChange(event) {
     const checked = event.target.checked;
@@ -19,7 +19,7 @@ export default function App() {
     const gp = navigator.getGamepads()[0];
 
     if (gp) {
-      setGamepad(gp); // aggiorna lo state
+      setGamepad(gp); 
       setButtons(
         gp.buttons.map(b => ({
           pressed: b.pressed,
@@ -36,6 +36,25 @@ export default function App() {
     btn()
   }, [])
 
+  function ax() {
+    const gp = navigator.getGamepads()[0];
+
+    if (gp) {
+      setGamepad(gp);
+      setAxes(gp.axes); // array di numeri che non funziona pero ora dovrebbe -> stronzo
+    }
+
+    requestAnimationFrame(ax);
+  }
+
+
+  useEffect(() => {
+    ax()
+  }, [])
+
+  //Serve un altro API che invii a node la mappatura iniziale quindi:
+  //- Manualmente quindi mappatura dagli input 
+  //- Caricare mappatura quindi il testo dell'area text
 
   function sendGamepadData(gp = gamepad, currentSelector = selector, currentSpeed = vel) {
     const data = gp
@@ -158,6 +177,7 @@ export default function App() {
             <div id="map">
               <div>
                 <h3>CREA UNA CONFIGURAZIONE</h3>
+                <h5>Bottoni</h5>
                 {buttons.map((btn, index) => (
                   <p key={index} className='p-mapping'>
                     <strong>Button ID {index}:</strong>{" "}
@@ -169,6 +189,19 @@ export default function App() {
                     />
                   </p>
                 ))}
+                <h5>Assi</h5>
+                {axes.map((value, index) => (
+                  <p key={index} className="p-mapping">
+                    <strong>ASSE ID {index}:</strong>{" "}
+                    {value.toFixed(2)}
+                    <strong> Value:</strong>{" "}
+                    <input
+                      type="text"
+                      className="button-mapping"
+                    />
+                  </p>
+                ))}
+
               </div>
               <div>
                 <h3>CARICA UNA CONFIGURAZIONE</h3>
