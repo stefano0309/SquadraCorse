@@ -29,12 +29,14 @@ nav ul {
   list-style: none;
 }
 
-nav a {
-  text-decoration: none;
+nav button {
+  padding: 5px;
+  background-color: blueviolet;
+  border: none;
   color: white;
 }
 
-nav a:hover {
+nav button:hover {
   border-bottom: 1px solid white;
 }
 

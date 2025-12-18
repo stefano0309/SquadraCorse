@@ -94,12 +94,19 @@ export default function App() {
   function handleLoginAdmin() {
     if (username === 'admin' && password === '1234') {
       setLogin('admin');
+      setUsername('')
+      setPassword('')
     } else {
       alert('Credenziali Admin errate');
+      setUsername('')
+      setPassword('')
     }
   }
   function handleLogin() {
     setLogin('client')
+  }
+  function handleHome(){
+    setLogin('')
   }
 
   // --- Render ---
@@ -110,7 +117,7 @@ export default function App() {
           <nav>
             <h1>🚙 Progetto Corse</h1>
             <ul>
-              <li><a href="#home">Home</a></li>
+              <li><button onClick={handleHome}>Login</button></li>
               <li><a href="#impostazioni">Impostazioni</a></li>
               <li><a href="#start">Start</a></li>
             </ul>
@@ -141,14 +148,15 @@ export default function App() {
     );
   }
 
+  //login admin
   if (login == 'admin') {
     return (
       <>
         <header>
           <nav>
-            <h1>🚙 Progetto Corse</h1>
+            <h1>🚙 Progetto Corse Admin</h1>
             <ul>
-              <li><a href="#home">Home</a></li>
+              <li><button onClick={handleHome}>Login</button></li>
               <li><a href="#impostazioni">Impostazioni</a></li>
               <li><a href="#start">Start</a></li>
             </ul>
@@ -247,6 +255,7 @@ export default function App() {
     );
   }
   
+  //login client
   if (login=='client'){
     return (
       <>
@@ -254,7 +263,7 @@ export default function App() {
           <nav>
             <h1>🚙 Progetto Corse</h1>
             <ul>
-              <li><a href="#home">Home</a></li>
+              <li><button onClick={handleHome}>Login</button></li>
               <li><a href="#impostazioni">Impostazioni</a></li>
               <li><a href="#start">Start</a></li>
             </ul>
