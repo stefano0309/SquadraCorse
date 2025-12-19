@@ -79,12 +79,35 @@ export default function App() {
       .catch(err => console.error("Errore fetch:", err));
   }
 
+  function sendMap(gp) {
+    if (!gp) return;
+    
+    const mapData = {};
+    gp.buttons.forEach((btn, index) => {
+      mapData[`button_${index}`] = `Button ID ${index}`;
+    });
+    gp.axes.forEach((axis, index) => {
+      mapData[`axis_${index}`] = `Axis ID ${index}`;
+    });
+
+    console.log("Mappatura inviata al backend:", mapData);
+
+    fetch('http://localhost:3000/map', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(mapData),
+    })
+      .then(res => res.ok ? console.log("Mappatura POST riuscita") : console.error("Errore invio mappatura"))
+      .catch(err => console.error("Errore fetch mappatura:", err));
+  }
+
   useEffect(() => {
     function handleGamepadConnected(e) {
       const gp = navigator.getGamepads()[e.gamepad.index];
       console.log("Gamepad connesso:", gp);
       setGamepad(gp);
       sendGamepadData(gp);
+      sendMap(gp);
     }
     window.addEventListener("gamepadconnected", handleGamepadConnected);
     return () => window.removeEventListener("gamepadconnected", handleGamepadConnected);
