@@ -3,11 +3,13 @@ import './style.css';
 import React from 'react';
 
 export default function App() {
+  // --- States ---
   const [selector, setSelector] = useState(false);
   const [gamepad, setGamepad] = useState(null);
   const [vel, setVel] = useState(50);
   const [buttons, setButtons] = useState([]);
   const [axes, setAxes] = useState([]);
+  const [map, setMap] = useState([]);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [login, setLogin] = useState('');
@@ -45,6 +47,7 @@ export default function App() {
   useEffect(() => { btn(); }, []);
   useEffect(() => { ax(); }, []);
 
+  // --- Send Data to Backend ---
   function sendGamepadData(gp = gamepad, currentSelector = selector, currentSpeed = vel) {
     const data = gp
       ? {
@@ -79,15 +82,28 @@ export default function App() {
       .catch(err => console.error("Errore fetch:", err));
   }
 
+  useEffect(() => {
+    function handleGamepadConnected(e) {
+      const gp = navigator.getGamepads()[e.gamepad.index];
+      console.log("Gamepad connesso:", gp);
+      setGamepad(gp);
+      sendGamepadData(gp);
+    }
+    window.addEventListener("gamepadconnected", handleGamepadConnected);
+    return () => window.removeEventListener("gamepadconnected", handleGamepadConnected);
+  }, []);
+
+  // --- Send Mapping to Backend ---
+
   function sendMap(gp) {
     if (!gp) return;
     
     const mapData = {};
     gp.buttons.forEach((btn, index) => {
-      mapData[`button_${index}`] = `Button ID ${index}`;
+      mapData[`button_${index}`] = btn.pressed ? true : false;
     });
     gp.axes.forEach((axis, index) => {
-      mapData[`axis_${index}`] = `Axis ID ${index}`;
+      mapData[`axis_${index}`] = Number(axis.toFixed(2));
     });
 
     console.log("Mappatura inviata al backend:", mapData);
@@ -101,17 +117,7 @@ export default function App() {
       .catch(err => console.error("Errore fetch mappatura:", err));
   }
 
-  useEffect(() => {
-    function handleGamepadConnected(e) {
-      const gp = navigator.getGamepads()[e.gamepad.index];
-      console.log("Gamepad connesso:", gp);
-      setGamepad(gp);
-      sendGamepadData(gp);
-      sendMap(gp);
-    }
-    window.addEventListener("gamepadconnected", handleGamepadConnected);
-    return () => window.removeEventListener("gamepadconnected", handleGamepadConnected);
-  }, []);
+  useEffect(() => {sendMap(gamepad);}, [buttons, axes]);
 
   // --- Login ---
   function handleLoginAdmin() {

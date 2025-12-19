@@ -161,10 +161,11 @@ input:checked+.slider:before {
 }
 
 .wrapper{
-  height: 90vh;
   display: flex;
   align-items: center;
   justify-content: center;
+  height: 70vh;
+  
 }
 
 .login-form{
