@@ -1,15 +1,12 @@
-import './style.css'
+import '../style.css'
 import { useState, useEffect } from 'react';
 
 
-export default function AdminPanel() {
-    const [selector, setSelector] = useState(false);
+export default function AdminPanel({selector, setSelector}) {
     const [gamepad, setGamepad] = useState(null);
     const [vel, setVel] = useState(50);
     const [buttons, setButtons] = useState([]);
     const [axes, setAxes] = useState([]);
-    const [map, setMap] = useState([]);
-
 
     function handleChange(event) {
         const checked = event.target.checked;

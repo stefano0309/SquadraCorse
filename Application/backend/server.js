@@ -5,9 +5,12 @@ import cors from 'cors';
 const app = express();
 const pathSetting = "./setting.json";
 const pathMap = "./map.json";
+const pathCredential = "./credential.json";
 
 app.use(cors());           
 app.use(express.json());  
+
+//Configurazione
 
 app.get('/config', (req, res) => {
   let data = '{}';
@@ -30,6 +33,8 @@ app.post('/config', (req, res) => {
   res.sendStatus(200);
 });
 
+//Mappatura
+
 app.get('/map', (req, res) => {
   let data = '{}';
   if (fs.existsSync(pathMap)) {
@@ -48,6 +53,29 @@ app.post('/map', (req, res) => {
   console.log("<h1>Mappa</h1>")
   console.log("Dati ricevuti:", req.body);
   fs.writeFileSync(pathMap, JSON.stringify(req.body, null, 4));
+  res.sendStatus(200);
+});
+
+//Credenziali
+
+app.get('/credential', (req, res) => {
+  let data = '{}';
+  if (fs.existsSync(pathCredential)) {
+    data = fs.readFileSync(pathCredential, 'utf-8') || '{}';
+  } else {
+    fs.writeFileSync(pathCredential, '{}');
+  }
+  try {
+    res.json(JSON.parse(data));
+  } catch {
+    res.json({});
+  }
+});
+
+app.post('/credential', (req, res) => {
+  console.log("<h1>Mappa</h1>")
+  console.log("Dati ricevuti:", req.body);
+  fs.writeFileSync(pathCredential, JSON.stringify(req.body, null, 4));
   res.sendStatus(200);
 });
 

@@ -1,12 +1,12 @@
 {
     "Envirioment": {
-        "maxSpeed": 50
+        "maxSpeed": "73"
     },
     "Setting": {
-        "mode": "volante",
-        "index": 0,
-        "id": "Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 09cc)",
-        "buttons": 18,
-        "axes": 4
+        "model": "controller",
+        "index": null,
+        "id": null,
+        "buttons": null,
+        "axes": null
     }
 }
