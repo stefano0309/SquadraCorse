@@ -202,3 +202,15 @@ input:checked+.slider:before {
   width: 300px;
   text-align: left;
 }
+
+#controller{
+  background-color: green;
+  width: 150px;
+  height: 50px;
+}
+
+#volante{
+  background-color: magenta;
+  width: 150px;
+  height: 50px;
+}

@@ -5,7 +5,17 @@ export default function ClientPanel({selector}) {
     return (
         <>
             <section>
-                {selector ? <h2>Modalità Controller</h2> : <h2>Modalità Volante</h2>}
+                {selector ?
+                <>
+                    <h2>Modalità Controller</h2>
+                    <div id="controller"></div>
+                </>
+                 : 
+                 <>
+                    <h2>Modalità Volante</h2>
+                    <div id="volante"></div>
+                 </>
+                }   
             </section>
         </>
     )
