@@ -1,4 +1,10 @@
 import pygame
+import serial
+
+ser = serial.Serial('/dev/ttyUSB0', 115200) # Porta seriale e baud rate (es. 115200)
+ser.write(b'AT\r\n') # Invia comando AT
+response = ser.read_all() # Leggi risposta
+ser.close()
 
 pygame.init()
 pygame.joystick.init()
@@ -40,6 +46,11 @@ while running:
                     print("Avvio del veicolo...")
                     start = True
                 else:
+                    print("Stop veicolo...")
+                    print("Menu principale richiamato.")
+                    print("X - Seleziona exit")
+                    print("PS button - Menu/start/stop veicolo")
+                    print("Avvio del veicolo...")
                     start = False
 
 
