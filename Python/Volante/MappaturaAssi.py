@@ -1,10 +1,9 @@
 import pygame
 import serial
+import json
+import time
 
-ser = serial.Serial('/dev/ttyUSB0', 115200) # Porta seriale e baud rate (es. 115200)
-ser.write(b'AT\r\n') # Invia comando AT
-response = ser.read_all() # Leggi risposta
-ser.close()
+ser = serial.Serial("COM3", 9600)  
 
 pygame.init()
 pygame.joystick.init()
@@ -61,6 +60,14 @@ while running:
         if start:
             if event.type == pygame.JOYAXISMOTION:
                     print(f"Asse: {event.axis} Velocità attuale: {event.value:.2f}")
+                    data = {
+                        "axis": event.axis,
+                        "value": event.value
+                    }
+                    packet = json.dumps(data)     
+                    ser.write(packet.encode())     
+                    print("Inviato:", packet)
+
                 
 
 pygame.quit()
