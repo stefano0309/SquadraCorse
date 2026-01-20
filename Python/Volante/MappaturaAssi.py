@@ -15,7 +15,6 @@ print(f"Volante rilevato: {js.get_name()}")
 print(f"Numero di pulsanti: {js.get_numbuttons()}")
 print(f"Numero di assi: {js.get_numaxes()}")
 
-clock = pygame.time.Clock()
 running = True
 
 while running:
@@ -29,12 +28,13 @@ while running:
 
         if event.type == pygame.JOYBUTTONDOWN:
             print(f"Pulsante premuto: {event.button}")
+            if event.button == 1:  # Supponiamo che il pulsante 0 sia "Start"
+                running = False
 
-    for axe in range(js.get_numaxes()):
-        value = js.get_axis(axe)
-        print(f"Asse {axe}: {value:.3f}")
+        if event.type == pygame.JOYAXISMOTION:
+            print(f"Asse {event.axis} mosso a {event.value:.2f}")
+    
+    
 
-    print("-" * 30)
-    clock.tick(10)  # 10 aggiornamenti al secondo
 
 pygame.quit()

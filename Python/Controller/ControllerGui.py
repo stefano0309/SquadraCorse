@@ -110,7 +110,7 @@ while running:
 
         # Pulsanti fisici
         if event.type == pygame.JOYBUTTONDOWN:
-            btn = event.but ton
+            btn = event.button
             if btn in button_state:
                 button_state[btn] = True
         if event.type == pygame.JOYBUTTONUP:
