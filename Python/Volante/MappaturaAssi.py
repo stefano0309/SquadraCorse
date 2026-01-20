@@ -15,7 +15,10 @@ print(f"Volante rilevato: {js.get_name()}")
 print(f"Numero di pulsanti: {js.get_numbuttons()}")
 print(f"Numero di assi: {js.get_numaxes()}")
 
+print("PS button menu principale richiamato")
 running = True
+start = False
+maxVelocity = 0
 
 while running:
     for event in pygame.event.get():
@@ -28,13 +31,22 @@ while running:
 
         if event.type == pygame.JOYBUTTONDOWN:
             print(f"Pulsante premuto: {event.button}")
-            if event.button == 1:  # Supponiamo che il pulsante 0 sia "Start"
+            
+            if event.button == 12:
+                print("Menu principale richiamato.")
+                print("X - Seleziona exit")
+                print("PS button - Menu start")
+                start = True
+                print("Avvio del veicolo...")
+
+
+            if event.button == 5:
+                print("Exit selezionato. Uscita dal programma.")
                 running = False
-
-        if event.type == pygame.JOYAXISMOTION:
-            print(f"Asse {event.axis} mosso a {event.value:.2f}")
     
-    
-
+        if start:
+            if event.type == pygame.JOYAXISMOTION:
+                    print(f"Asse: {event.axis} Velocità attuale: {event.value:.2f}")
+                
 
 pygame.quit()
