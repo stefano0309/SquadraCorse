@@ -33,11 +33,14 @@ while running:
             print(f"Pulsante premuto: {event.button}")
             
             if event.button == 12:
-                print("Menu principale richiamato.")
-                print("X - Seleziona exit")
-                print("PS button - Menu start")
-                start = True
-                print("Avvio del veicolo...")
+                if start == False:
+                    print("Menu principale richiamato.")
+                    print("X - Seleziona exit")
+                    print("PS button - Menu start")
+                    print("Avvio del veicolo...")
+                    start = True
+                else:
+                    start = False
 
 
             if event.button == 5:
