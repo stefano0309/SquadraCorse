@@ -1,7 +1,6 @@
 import pygame
-import os
 import json
-import time
+from volanteFunzioni import *
 from colorama import Fore, Back, Style, init
 
 
@@ -37,66 +36,10 @@ maxVelocity = 50
 maxAngle = 45
 selected = 0
 
-#---- Funzioni generali -----
-
-def drawMenu():
-    os.system('cls' if os.name == 'nt' else 'clear')
-    print(Fore.YELLOW +  "Menu principale:" + Style.RESET_ALL)
-    print("\tQUADRATO - Impostazioni veicolo")
-    print("\tPS button - Menu/start/stop veicolo")
-    print(Fore.RED + "\tX - Seleziona exit" + Style.RESET_ALL)
-    print("Avvio del veicolo...")
-
-
-def drawSettings():
-    os.system('cls' if os.name == 'nt' else 'clear')
-    print("Impostazioni veicolo selezionate.")
-    for idx, option in enumerate(option_selected, start=1):
-        if idx - 1 == selected:
-            print(Fore.YELLOW + f"\t> {idx}. {option} <" + Style.RESET_ALL)
-        else: 
-            print(f"\t{idx}. {option}")
-    print("Premi CERCHIO per selezionare l'opzione.")     
-    print(Fore.RED + "Premi X per tornare al menu principale." + Style.RESET_ALL)
-
-def settingOption(value, position, max, min, var, id, idValue, subdivision):
-    if value > 0 and value > position:
-        if var >= max:
-            var = max
-        else:
-            var += 1
-    else:
-        if var <= min:
-            var = min
-        else:
-            var -= 1
-    position= value
-    os.system('cls' if os.name == 'nt' else 'clear')
-    print("Impostazioni veicolo selezionate.")
-    for idx, option in enumerate(option_selected, start=1):
-        if idx - 1 == id:
-            print(Fore.YELLOW + f"\t> {idx}. {option} <" + Style.RESET_ALL)
-            if id == idValue:
-                drawSettingOption(min, max, var, subdivision)
-        else: 
-            print(f"\t{idx}. {option}")
-    print("Premi CERCHIO per selezionare l'opzione.")
-    print(Fore.RED + "Premi X per tornare al menu principale." + Style.RESET_ALL)
-    return position, var
-
-def drawSettingOption(min, max, var, subdivision):
-    print(Fore.CYAN + f"\t   {min}" + Style.RESET_ALL, end=' ')
-    [print(Fore.CYAN + "|"+ Style.RESET_ALL, end='') for x in range(int(var / subdivision))]
-    [print("|", end='') for x in range(20-int(var/subdivision))]
-    print(Fore.CYAN+ f" {max} > {var}" + Style.RESET_ALL) 
-    
-
-option_selected = ["Regolazione massima velocità", "Regolazione angolo massimo sterzo"]
-
 while running:
     for event in pygame.event.get():
-        #----- Uscita dal programma tastiera------
 
+        #----- Uscita dal programma tastiera------
         if event.type == pygame.QUIT:
             running = False
 
@@ -107,20 +50,18 @@ while running:
         if event.type == pygame.JOYBUTTONDOWN:
             print(f"Pulsante premuto: {event.button}")
 
+            #----- Retromarcia / Inserita - Disinserita -----
             if event.button == 9:
-                if retromarcia:
-                    retromarcia = False
-                    print(Fore.GREEN + "Retromarcia disinserita." + Style.RESET_ALL)
-                else:
-                    retromarcia = True
-                    print(Fore.GREEN + "Retromarcia inserita." + Style.RESET_ALL)
-                    
-
-            #------ Menu principale / Avvio e stop veicolo ------
+                retromarcia = True
+                print(Fore.GREEN + "Retromarcia inserita." + Style.RESET_ALL)
             
+            if event.button == 8:
+                retromarcia = False
+                print(Fore.GREEN + "Retromarcia disinserita." + Style.RESET_ALL)
+            #------ Menu principale / Avvio e stop veicolo ------
             if event.button == 12:
                 if fistStart:
-                    os.system('cls' if os.name == 'nt' else 'clear')
+                    CLEAR()
                     fistStart = False
                     print("Avvio del veicolo...")
                     start = True
@@ -132,19 +73,16 @@ while running:
                     drawMenu()
                     
             #------ Uscita programma ------
-
             if event.button == 5 and start == False and settings == False:
                 print(Fore.GREEN + "Exit selezionato. Uscita dal programma." + Style.RESET_ALL)
                 running = False
-            
 
             #------ Impostazioni veicolo ------
-            
             if not settings:
                 if event.button == 3 and start == False:
                     settings = True
                     selected = 0
-                    drawSettings()
+                    drawSettings(selected)
             
             if settings:
                 if event.button == 0:
@@ -153,7 +91,7 @@ while running:
                         selected = 0
                     else:
                         selected -=1
-                    drawSettings()
+                    drawSettings(selected)
 
                 if event.button == 1:
                     selectItem = False
@@ -161,17 +99,17 @@ while running:
                         selected = len(option_selected) - 1
                     else:
                         selected +=1
-                    drawSettings()
+                    drawSettings(selected)
 
                 if event.button == 4 :
                     positionNow = 0
                     if selectItem:
                         selectItem = False
-                        drawSettings()
+                        drawSettings(selected)
                 
                     else:
                         selectItem = True
-                        os.system('cls' if os.name == 'nt' else 'clear')
+                        CLEAR()
                         print("Impostazioni veicolo selezionate.")
                         for idx, option in enumerate(option_selected, start=1):
                             if idx - 1 == selected:
@@ -189,8 +127,6 @@ while running:
                     settings = False
                     selectItem = False
                     drawMenu()
-
-            
 
         #------ Regolazione impostazioni ------
 
@@ -221,6 +157,5 @@ while running:
                     "acceleratore": round(js.get_axis(5),2),
                     "freno": round(js.get_axis(1),2),
                 })
-                
-           
+                   
 pygame.quit()
