@@ -6,15 +6,6 @@ from colorama import Fore, Back, Style, init
 
 
 init(autoreset=True)
-"""
-print(Fore.RED + 'Testo Rosso')
-print(Back.GREEN + 'Testo con sfondo Verde')
-print(Style.BRIGHT + Fore.CYAN + 'Testo Ciano brillante')
-print('Testo normale (grazie ad autoreset=True)')
-"""
-
-
-
 pygame.init()
 pygame.joystick.init()
 data = {}
@@ -33,22 +24,77 @@ print(f"\t- Numero di pulsanti: {js.get_numbuttons()}")
 print(f"\t- Numero di assi: {js.get_numaxes()}")
 
 print(Fore.YELLOW+ "\nCLICCARE PULSANTE PS PER INIZIARE" + Style.RESET_ALL)
-fistStart = True
 
+fistStart = True
 running = True
 start = False
 settings = False
 selectItem = False
+retromarcia = False
 
 positionNow = 0
-maxVelocity = 0
+maxVelocity = 50
+maxAngle = 45
 selected = 0
 
-option_selected = ["Regolazione massima velocità", "Altre impostazioni future"]
+#---- Funzioni generali -----
+
+def drawMenu():
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print(Fore.YELLOW +  "Menu principale:" + Style.RESET_ALL)
+    print("\tQUADRATO - Impostazioni veicolo")
+    print("\tPS button - Menu/start/stop veicolo")
+    print(Fore.RED + "\tX - Seleziona exit" + Style.RESET_ALL)
+    print("Avvio del veicolo...")
+
+
+def drawSettings():
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print("Impostazioni veicolo selezionate.")
+    for idx, option in enumerate(option_selected, start=1):
+        if idx - 1 == selected:
+            print(Fore.YELLOW + f"\t> {idx}. {option} <" + Style.RESET_ALL)
+        else: 
+            print(f"\t{idx}. {option}")
+    print("Premi CERCHIO per selezionare l'opzione.")     
+    print(Fore.RED + "Premi X per tornare al menu principale." + Style.RESET_ALL)
+
+def settingOption(value, position, max, min, var, id, idValue, subdivision):
+    if value > 0 and value > position:
+        if var >= max:
+            var = max
+        else:
+            var += 1
+    else:
+        if var <= min:
+            var = min
+        else:
+            var -= 1
+    position= value
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print("Impostazioni veicolo selezionate.")
+    for idx, option in enumerate(option_selected, start=1):
+        if idx - 1 == id:
+            print(Fore.YELLOW + f"\t> {idx}. {option} <" + Style.RESET_ALL)
+            if id == idValue:
+                drawSettingOption(min, max, var, subdivision)
+        else: 
+            print(f"\t{idx}. {option}")
+    print("Premi CERCHIO per selezionare l'opzione.")
+    print(Fore.RED + "Premi X per tornare al menu principale." + Style.RESET_ALL)
+    return position, var
+
+def drawSettingOption(min, max, var, subdivision):
+    print(Fore.CYAN + f"\t   {min}" + Style.RESET_ALL, end=' ')
+    [print(Fore.CYAN + "|"+ Style.RESET_ALL, end='') for x in range(int(var / subdivision))]
+    [print("|", end='') for x in range(20-int(var/subdivision))]
+    print(Fore.CYAN+ f" {max} > {var}" + Style.RESET_ALL) 
+    
+
+option_selected = ["Regolazione massima velocità", "Regolazione angolo massimo sterzo"]
 
 while running:
     for event in pygame.event.get():
-
         #----- Uscita dal programma tastiera------
 
         if event.type == pygame.QUIT:
@@ -61,39 +107,34 @@ while running:
         if event.type == pygame.JOYBUTTONDOWN:
             print(f"Pulsante premuto: {event.button}")
 
+            if event.button == 9:
+                if retromarcia:
+                    retromarcia = False
+                    print(Fore.GREEN + "Retromarcia disinserita." + Style.RESET_ALL)
+                else:
+                    retromarcia = True
+                    print(Fore.GREEN + "Retromarcia inserita." + Style.RESET_ALL)
+                    
+
             #------ Menu principale / Avvio e stop veicolo ------
             
             if event.button == 12:
                 if fistStart:
-                    fistStart = False
                     os.system('cls' if os.name == 'nt' else 'clear')
-                    print(Fore.YELLOW +  "Menu principale:" + Style.RESET_ALL)
-                    print("\tQUADRATO - Impostazioni veicolo")
-                    print("\tPS button - Menu/start/stop veicolo")
-                    print(Fore.RED + "\tX - Seleziona exit" + Style.RESET_ALL)
+                    fistStart = False
                     print("Avvio del veicolo...")
                     start = True
                 elif start == False:
-                    os.system('cls' if os.name == 'nt' else 'clear')
-                    print(Fore.YELLOW +  "Menu principale:" + Style.RESET_ALL)
-                    print("\tQUADRATO - Impostazioni veicolo")
-                    print("\tPS button - Menu/start/stop veicolo")
-                    print(Fore.RED + "\tX - Seleziona exit" + Style.RESET_ALL)
-                    print("Avvio del veicolo...")
+                    drawMenu()
                     start = True
                 else:
                     start = False
-                    os.system('cls' if os.name == 'nt' else 'clear')
-                    print(Fore.YELLOW +  "Menu principale:" + Style.RESET_ALL)
-                    print("\tQUADRATO - Impostazioni veicolo")
-                    print("\tPS button - Menu/start/stop veicolo")
-                    print(Fore.RED + "\tX - Seleziona exit" + Style.RESET_ALL)
-                    print("Avvio del veicolo...")
+                    drawMenu()
                     
             #------ Uscita programma ------
 
             if event.button == 5 and start == False and settings == False:
-                print("Exit selezionato. Uscita dal programma.")
+                print(Fore.GREEN + "Exit selezionato. Uscita dal programma." + Style.RESET_ALL)
                 running = False
             
 
@@ -103,16 +144,7 @@ while running:
                 if event.button == 3 and start == False:
                     settings = True
                     selected = 0
-                    os.system('cls' if os.name == 'nt' else 'clear')
-                    print("Impostazioni veicolo selezionate.")
-                    
-                    for idx, option in enumerate(option_selected, start=1):
-                        if idx - 1 == selected:
-                            print(Fore.YELLOW + f"\t> {idx}. {option} <" + Style.RESET_ALL)
-                        else: 
-                            print(f"\t{idx}. {option}")
-                    print("Premi CERCHIO per selezionare l'opzione.")     
-                    print(Fore.RED + "Premi X per tornare al menu principale." + Style.RESET_ALL)
+                    drawSettings()
             
             if settings:
                 if event.button == 0:
@@ -121,15 +153,7 @@ while running:
                         selected = 0
                     else:
                         selected -=1
-                    os.system('cls' if os.name == 'nt' else 'clear')
-                    print("Impostazioni veicolo selezionate.")
-                    for idx, option in enumerate(option_selected, start=1):
-                        if idx - 1 == selected:
-                            print(Fore.YELLOW + f"\t> {idx}. {option} <" + Style.RESET_ALL)
-                        else: 
-                            print(f"\t{idx}. {option}")
-                    print("Premi CERCHIO per selezionare l'opzione.")
-                    print(Fore.RED + "Premi X per tornare al menu principale." + Style.RESET_ALL)
+                    drawSettings()
 
                 if event.button == 1:
                     selectItem = False
@@ -137,29 +161,13 @@ while running:
                         selected = len(option_selected) - 1
                     else:
                         selected +=1
-                    os.system('cls' if os.name == 'nt' else 'clear')
-                    print("Impostazioni veicolo selezionate.")
-                    for idx, option in enumerate(option_selected, start=1):
-                        if idx - 1 == selected:
-                            print(Fore.YELLOW + f"\t> {idx}. {option} <" + Style.RESET_ALL)
-                        else: 
-                            print(f"\t{idx}. {option}")
-                    print("Premi CERCHIO per selezionare l'opzione.")
-                    print(Fore.RED + "Premi X per tornare al menu principale." + Style.RESET_ALL)
+                    drawSettings()
 
                 if event.button == 4 :
-                    
+                    positionNow = 0
                     if selectItem:
                         selectItem = False
-                        os.system('cls' if os.name == 'nt' else 'clear')
-                        print("Impostazioni veicolo selezionate.")
-                        for idx, option in enumerate(option_selected, start=1):
-                            if idx - 1 == selected:
-                                print(Fore.YELLOW + f"\t> {idx}. {option} <" + Style.RESET_ALL)
-                            else: 
-                                print(f"\t{idx}. {option}")
-                        print("Premi CERCHIO per selezionare l'opzione.")
-                        print(Fore.RED + "Premi X per tornare al menu principale." + Style.RESET_ALL)
+                        drawSettings()
                 
                     else:
                         selectItem = True
@@ -169,10 +177,9 @@ while running:
                             if idx - 1 == selected:
                                 print(Fore.YELLOW + f"\t> {idx}. {option} <" + Style.RESET_ALL)
                                 if selected == 0:
-                                    print(Fore.CYAN + "\t   0%" + Style.RESET_ALL, end=' ')
-                                    [print(Fore.CYAN + "|"+ Style.RESET_ALL, end='') for x in range(int(maxVelocity / 5))]
-                                    [print("|", end='') for x in range(20-int(maxVelocity/5))]
-                                    print(Fore.CYAN+ f" 100% > {maxVelocity}" + Style.RESET_ALL) 
+                                    drawSettingOption(0,100,maxVelocity,5)
+                                if selected == 1:
+                                    drawSettingOption(0,180,maxAngle,9)
                             else: 
                                 print(f"\t{idx}. {option}")
                         print("Premi CERCHIO per selezionare l'opzione.")
@@ -181,42 +188,21 @@ while running:
                 if event.button == 5:
                     settings = False
                     selectItem = False
-                    os.system('cls' if os.name == 'nt' else 'clear')
-                    print(Fore.YELLOW +  "Menu principale:" + Style.RESET_ALL)
-                    print("\tQUADRATO - Impostazioni veicolo")
-                    print("\tPS button - Menu/start/stop veicolo")
-                    print(Fore.RED + "\tX - Seleziona exit" + Style.RESET_ALL)
-                    print("Avvio del veicolo...")
+                    drawMenu()
+
+            
+
+        #------ Regolazione impostazioni ------
 
         if event.type == pygame.JOYAXISMOTION:
-            if event.axis == 0 and selected == 0 and selectItem :
-                
-                if event.value > 0 and event.value > positionNow:
-                    if maxVelocity >= 100:
-                        maxVelocity = 100
-                    else:
-                        maxVelocity += 1
-                else:
-                    if maxVelocity <= 0:
-                        maxVelocity = 0
-                    else:
-                        maxVelocity -= 1
-                positionNow = event.value
-                os.system('cls' if os.name == 'nt' else 'clear')
-                print("Impostazioni veicolo selezionate.")
-                for idx, option in enumerate(option_selected, start=1):
-                    if idx - 1 == selected:
-                        print(Fore.YELLOW + f"\t> {idx}. {option} <" + Style.RESET_ALL)
-                        if selected == 0:
-                            print(Fore.CYAN + "\t   0%" + Style.RESET_ALL, end=' ')
-                            [print(Fore.CYAN + "|"+ Style.RESET_ALL, end='') for x in range(int(maxVelocity / 5))]
-                            [print("|", end='') for x in range(20-int(maxVelocity/5))]
-                            print(Fore.CYAN+ f" 100% > {maxVelocity}" + Style.RESET_ALL) 
-                    else: 
-                        print(f"\t{idx}. {option}")
-                print("Premi CERCHIO per selezionare l'opzione.")
-                print(Fore.RED + "Premi X per tornare al menu principale." + Style.RESET_ALL)
-
+            if event.axis == 0  and selectItem :
+                #----- Regolazione massima velocità ------
+                if selected == 0:
+                    positionNow, maxVelocity = settingOption(event.value, positionNow, 100, 0, maxVelocity, selected, 0, 5)
+                    
+                #----- Regolazione angolo massimo sterzo ------
+                if selected == 1:
+                    positionNow, maxAngle = settingOption(event.value, positionNow, 180, 0, maxAngle, selected, 1, 9)
 
         #------ Invio dati assi ------
     
