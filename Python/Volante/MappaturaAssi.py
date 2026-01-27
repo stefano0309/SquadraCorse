@@ -3,10 +3,11 @@ import serial
 import json
 import time
 
-ser = serial.Serial("COM3", 9600)  
+
 
 pygame.init()
 pygame.joystick.init()
+data = {}
 
 if pygame.joystick.get_count() == 0:
     print("Nessun controller trovato.")
@@ -53,21 +54,17 @@ while running:
                     start = False
 
 
-            if event.button == 5:
+            if event.button == 5 and start == False:
                 print("Exit selezionato. Uscita dal programma.")
                 running = False
     
         if start:
+            
             if event.type == pygame.JOYAXISMOTION:
-                    print(f"Asse: {event.axis} Velocità attuale: {event.value:.2f}")
-                    data = {
-                        "axis": event.axis,
-                        "value": event.value
-                    }
-                    packet = json.dumps(data)     
-                    ser.write(packet.encode())     
-                    print("Inviato:", packet)
-
+                    data.update({
+                        "volante" if event.axis == 0 else "acceleratore" if event.axis==5 else "freno" if event.axis==1 else "altro": round(event.value, 2),
+                    })
                 
-
+            packet = json.dumps(data)      
+            print("Inviato:", packet)
 pygame.quit()

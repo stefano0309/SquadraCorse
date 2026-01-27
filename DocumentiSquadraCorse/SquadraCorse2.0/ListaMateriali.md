@@ -7,7 +7,7 @@
 ![MOdulo espanzione GPIO](https://m.media-amazon.com/images/I/713XlsgYQ5L._AC_SY450_.jpg) 
 ![Modulo espanzione GPIO2](https://m.media-amazon.com/images/I/71rHqdBTNuL._AC_SY450_.jpg)
 
-[Link amamzon ->](https://www.amazon.it/XTVTX-Morsettiera-Raspberry-Connettore-Espansione/dp/B09XV2VS4M/ref=asc_df_B09XV2VS4M?mcid=18026b72f87c37ae82e1718f8086b7c4&tag=googshopit-21&linkCode=df0&hvadid=700848484305&hvpos=&hvnetw=g&hvrand=15869697105286985835&hvpone=&hvptwo=&hvqmt=&hvdev=c&hvdvcmdl=&hvlocint=&hvlocphy=9201590&hvtargid=pla-2035819517468&psc=1&hvocijid=15869697105286985835-B09XV2VS4M-&hvexpln=0) Modulo espansione GPIO
+[Link amamzon ->](https://www.amazon.it/XTVTX-Morsettiera-Raspberry-Connettore-Espansione/dp/B09XV2VS4M/ref=asc_df_B09XV2VS4M?mcid=18026b72f87c37ae82e1718f8086b7c4&tag=googshopit-21&linkCode=df0&hvadid=700848484305&hvpos=&hvnetw=g&hvrand=15869697105286985835&hvpone=&hvptwo=&hvqmt=&hvdev=c&hvdvcmdl=&hvlocint=&hvlocphy=9201590&hvtargid=pla-2035819517468&psc=1&hvocijid=15869697105286985835-B09XBV2VS4M-&hvexpln=0) Modulo espansione GPIO
 
 ### Alimentazione RaspBerry Pi
 
