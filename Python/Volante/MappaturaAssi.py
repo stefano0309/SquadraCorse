@@ -1,5 +1,5 @@
 import pygame
-import serial
+import os
 import json
 import time
 
@@ -24,6 +24,7 @@ print(f"Numero di assi: {js.get_numaxes()}")
 print("PS button menu principale richiamato")
 running = True
 start = False
+settings = False
 maxVelocity = 0
 
 while running:
@@ -40,23 +41,42 @@ while running:
             
             if event.button == 12:
                 if start == False:
+                    os.system('cls' if os.name == 'nt' else 'clear')
                     print("Menu principale richiamato.")
-                    print("X - Seleziona exit")
+                    print("❌ - Seleziona exit")
+                    print("⬜ - Impostazioni veicolo")
                     print("PS button - Menu start")
                     print("Avvio del veicolo...")
                     start = True
                 else:
+                    os.system('cls' if os.name == 'nt' else 'clear')
                     print("Stop veicolo...")
                     print("Menu principale richiamato.")
-                    print("X - Seleziona exit")
+                    print("❌ - Seleziona exit")
+                    print("⬜ - Impostazioni veicolo")
                     print("PS button - Menu/start/stop veicolo")
                     print("Avvio del veicolo...")
                     start = False
 
 
-            if event.button == 5 and start == False:
+            if event.button == 5 and start == False and settings == False:
                 print("Exit selezionato. Uscita dal programma.")
                 running = False
+            if event.button == 5 and settings:
+                settings = False
+                os.system('cls' if os.name == 'nt' else 'clear')
+                print("Tornato al menu principale.")
+                print("❌ - Seleziona exit")
+                print("⬜ - Impostazioni veicolo")
+                print("PS button - Menu/start/stop veicolo")
+                print("Avvio del veicolo...")
+            if event.button == 3 and start == False:
+                settings = True
+                os.system('cls' if os.name == 'nt' else 'clear')
+                print("Impostazioni veicolo selezionate.")
+                print("\t- Regolazione massima velocità")
+                print("Premi ❌ per tornare al menu principale.")
+
     
         if start:
             
