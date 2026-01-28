@@ -24,3 +24,46 @@ La comunicazione avviene tra:
 - Un Raspberry Pi installato sulla macchinina, che gestisce la telemetria in tempo reale, la trasmissione dei dati e il controllo dei motori.
 
 Questa architettura consente un flusso di dati bidirezionale e una risposta immediata ai comandi inviati dal controller.
+
+## Utilizzo
+
+1. Creare un ambiente virtuale
+Dalla root della repository (SquadraCorse/):
+
+Linux / macOS
+python3 -m venv .venv
+
+Windows
+python -m venv .venv
+
+
+2. Attivare l’ambiente virtuale
+
+Linux / macOS
+source .venv/bin/activate
+
+Windows (PowerShell)
+.venv\Scripts\activate
+
+
+Dopo l’attivazione, vedrai il prompt modificato così:
+
+(.venv) $
+
+
+3. Installare le dipendenze
+
+pip install -r requirements.txt
+
+
+4. Eseguire il programma
+⚠️ Da root della repo, non entrare in src/:
+
+python -m src.squadracorse.main
+
+
+Questo comando avvia il programma e permette a Python di trovare correttamente i moduli.
+
+5. Uscire dal programma
+
+Chiudi la finestra o premi ESC / pulsanti previsti nel menu.

@@ -1,6 +1,6 @@
 import pygame
 import json
-from volanteFunzioni import *
+from src.utils import *
 from colorama import Fore, Back, Style, init
 
 init(autoreset=True)
