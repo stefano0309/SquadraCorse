@@ -73,7 +73,11 @@ while running:
                 if settings:
                     settings = False
                     selectItem = False
-                    drawMenu()
+                    dataSetting = {
+                        "maxVelocity": maxVelocity,
+                        "maxAngle": maxAngle
+                    }
+                    drawMenu() 
 
             #------ Impostazioni veicolo ------
             if not settings:

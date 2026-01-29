@@ -59,7 +59,7 @@ pip install -r requirements.txt
 4. Eseguire il programma
 ⚠️ Da root della repo, non entrare in src/:
 
-python -m src.squadracorse.main
+python -m src.main
 
 
 Questo comando avvia il programma e permette a Python di trovare correttamente i moduli.

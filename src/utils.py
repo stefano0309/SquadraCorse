@@ -1,7 +1,5 @@
-
 import os
 from colorama import * 
-
 
 option_selected = ["Regolazione massima velocità", "Regolazione angolo massimo sterzo"]
 
