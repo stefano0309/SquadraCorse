@@ -11,7 +11,7 @@ def INIZIALISE(js):
     print(f"\t- Volante rilevato: {js.get_name()}")
     print(f"\t- Numero di pulsanti: {js.get_numbuttons()}")
     print(f"\t- Numero di assi: {js.get_numaxes()}")
-    print(Fore.YELLOW+ "\nCLICCARE PULSANTE PS PER INIZIARE" + Style.RESET_ALL)
+    print(Fore.YELLOW+ "\nCLICCARE PULSANTE PS PER ANDARE AVANTI" + Style.RESET_ALL)
 
 #---- Funzioni programma -----
 
