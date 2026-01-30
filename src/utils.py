@@ -1,8 +1,6 @@
 import os
 from colorama import * 
 
-option_selected = ["Regolazione massima velocità", "Regolazione angolo massimo sterzo"]
-
 #---- Funzioni generali ----
 
 def CLEAR():
@@ -26,10 +24,10 @@ def drawMenu():
     print("Avvio del veicolo...")
 
 
-def drawSettings(slx):
+def drawSettings(slx, opt):
     os.system('cls' if os.name == 'nt' else 'clear')
     print("Impostazioni veicolo selezionate.")
-    for idx, option in enumerate(option_selected, start=1):
+    for idx, option in enumerate(opt, start=1):
         if idx - 1 == slx:
             print(Fore.YELLOW + f"\t> {idx}. {option} <" + Style.RESET_ALL)
         else: 
@@ -37,7 +35,7 @@ def drawSettings(slx):
     print("Premi CERCHIO per selezionare l'opzione.")     
     print(Fore.RED + "Premi X per tornare al menu principale." + Style.RESET_ALL)
 
-def settingOption(value, position, max, min, var, id, idValue, subdivision):
+def settingOption(value, position, max, min, var, id, idValue, subdivision, opt):
     if value > 0 and value > position:
         if var >= max:
             var = max
@@ -51,7 +49,7 @@ def settingOption(value, position, max, min, var, id, idValue, subdivision):
     position= value
     os.system('cls' if os.name == 'nt' else 'clear')
     print("Impostazioni veicolo selezionate.")
-    for idx, option in enumerate(option_selected, start=1):
+    for idx, option in enumerate(opt, start=1):
         if idx - 1 == id:
             print(Fore.YELLOW + f"\t> {idx}. {option} <" + Style.RESET_ALL)
             if id == idValue:
