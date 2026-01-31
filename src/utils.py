@@ -4,18 +4,37 @@ import json
 
 #---- Funzioni setUp ----
 
+presetButton = ["12","5","3","0","1","4","9","8"]
+presetAxis = ["0","5","1"]
+
+def configMenu(path):
+    print(Fore.YELLOW + "Menu di configurazione:" + Style.RESET_ALL)
+    if os.path.exists(path):
+        print(Fore.GREEN + "\nFile di configurazione trovato \n" + Style.RESET_ALL)
+    else:
+        print(Fore.GREEN + "\nFile di configurazione non trovato" + Style.RESET_ALL)
+        print(Fore.YELLOW + "\nCreazione di una configurazione:")
+        print("Configurazione:\n\t- Se il campo e vuoto viene caricato un preset\n\t- Se inserisci un valore verra creata una configurazione personalizata")
+        
 def buttonMap(button, axis, path):
     dataButton = {}
     dataAxis = {}
     data = {}
+    configMenu(path)
     if not os.path.exists(path):
-        for btn in button:
+        print(Fore.GREEN + "Configurazione buttoni:" + Style.RESET_ALL)
+        for idx, btn in enumerate(button):
             btnValue = input(f"{btn}: ")
+            if btnValue == "":
+                btnValue = presetButton[idx]
             dataButton.update({
                 btn: btnValue
             })
-        for x in axis:
+        print(Fore.GREEN + "Configurazione assi:" + Style.RESET_ALL)
+        for idx, x in enumerate(axis):
             axisValue = input(f"{x}: ")
+            if axisValue == "":
+                axisValue = presetAxis[idx]
             dataAxis.update({
                 x: axisValue
             })

@@ -8,7 +8,9 @@ init(autoreset=True)
 path = "./config.json"
 button = ["START", "EXIT", "SETTINGS", "UP", "DOWN", "SELECT", "RETRO_ON", "RETRO_OFF"]
 axis = ["STEERING", "ACCELERATOR", "BRAKE"]
-option = ["Regolazione massima velocità", "Regolazione angolo massimo sterzo"]
+option = ["Regolazione massima velocità", 
+          "Regolazione angolo massimo sterzo", 
+          "Reset mappatura tasti"]
 
 class Volante():
     def __init__(self):
@@ -21,8 +23,10 @@ class Volante():
             quit()
 
         self.js = pygame.joystick.Joystick(0)
+
         buttonMap(button, axis, path)
         buttonMp, axisMp = loadMap(path)
+
         INIZIALISE(self.js)
 
         #Dati
@@ -173,11 +177,20 @@ class Volante():
                     drawSettingOption(0, 100, self.velocity, 5)
                 if self.selected == 1:
                     drawSettingOption(0, 180, self.angle, 9)
+                if self.selected == 2:
+                    CLEAR()
+                    os.remove(path)
+                    buttonMap(button, axis, path)
+                    self.buttons, self.axis = loadMap(path)
+                    CLEAR()
+                    self.settings = False
+                    drawMenu()
+
             else:
                 print(f"\t{idx}. {option}")
-
-        print("Premi CERCHIO per selezionare l'opzione.")
-        print(Fore.RED + "Premi X per tornare al menu principale.")
+        if self.settings:
+            print("Premi CERCHIO per selezionare l'opzione.")
+            print(Fore.RED + "Premi X per tornare al menu principale.")
 
     def invioDati(self):
         self.data.update({
