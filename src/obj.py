@@ -122,6 +122,11 @@ class Volante():
         if self.settings:
             self.settings = False
             self.selectItem = False
+            self.dataSetting.update({
+                "velocity": self.velocity,
+                "angle": self.angle
+            })
+            pachet = json.dumps(self.dataSetting)
             drawMenu()
             
     def gestioneImpostazioni(self):

@@ -1,24 +1,13 @@
 from src.obj import Volante
+from src.utils import  *
 
-button = {
-    "START": 12,
-    "EXIT": 5,
-    "SETTINGS": 3,
-    "UP": 0,
-    "DOWN": 1,
-    "SELECT": 4,
-    "RETRO_ON": 9,
-    "RETRO_OFF": 8
-}
-
-axis = {
-    "STEERING": 0,
-    "ACCELERATOR": 5,
-    "BRAKE": 1
-}
-
+path = "./config.json"
+button = ["START", "EXIT", "SETTINGS", "UP", "DOWN", "SELECT", "RETRO_ON", "RETRO_OFF"]
+axis = ["STEERING", "ACCELERATOR", "BRAKE"]
 option = ["Regolazione massima velocità", "Regolazione angolo massimo sterzo"]
 
 if __name__ == "__main__":
-    app = Volante(button, axis, option)
+    buttonMap(button, axis, path)
+    buttonMp, axisMp = loadMap(path)
+    app = Volante(buttonMp, axisMp, option)
     app.run()

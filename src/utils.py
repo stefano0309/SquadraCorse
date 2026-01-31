@@ -1,5 +1,37 @@
 import os
 from colorama import * 
+import json
+
+#---- Funzioni setUp ----
+
+def buttonMap(button, axis, path):
+    dataButton = {}
+    dataAxis = {}
+    data = {}
+    if not os.path.exists(path):
+        for btn in button:
+            btnValue = input(f"{btn}: ")
+            dataButton.update({
+                btn: btnValue
+            })
+        for x in axis:
+            axisValue = input(f"{x}: ")
+            dataAxis.update({
+                x: axisValue
+            })
+        data.update({
+            "button": dataButton,
+            "axis": dataAxis
+        })
+        with open("config.json", mode="w") as f:
+            json.dump(data, f, indent=4)
+
+def loadMap(path):
+    with open(path, mode="r") as f:
+        dati = json.load(f)
+        buttons = {k: int(v) for k, v in dati["button"].items()}
+        axis = {k: int(v) for k, v in dati["axis"].items()}
+    return buttons, axis
 
 #---- Funzioni generali ----
 
