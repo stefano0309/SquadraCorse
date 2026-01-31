@@ -5,8 +5,13 @@ from src.utils import *
 
 init(autoreset=True)
 
+path = "./config.json"
+button = ["START", "EXIT", "SETTINGS", "UP", "DOWN", "SELECT", "RETRO_ON", "RETRO_OFF"]
+axis = ["STEERING", "ACCELERATOR", "BRAKE"]
+option = ["Regolazione massima velocità", "Regolazione angolo massimo sterzo"]
+
 class Volante():
-    def __init__(self, button, axis, option):
+    def __init__(self):
         pygame.init()
         pygame.joystick.init()
 
@@ -16,6 +21,8 @@ class Volante():
             quit()
 
         self.js = pygame.joystick.Joystick(0)
+        buttonMap(button, axis, path)
+        buttonMp, axisMp = loadMap(path)
         INIZIALISE(self.js)
 
         #Dati
@@ -28,8 +35,8 @@ class Volante():
 
         #inputs
         self.option_selected = option
-        self.buttons = button
-        self.axis = axis
+        self.buttons = buttonMp
+        self.axis = axisMp
 
         #Stato UI
         self.selected = 0
