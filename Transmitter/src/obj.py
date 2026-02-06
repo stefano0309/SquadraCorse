@@ -8,8 +8,8 @@ init(autoreset=True)
 path = "./config.json"
 button = ["START", "EXIT", "SETTINGS", "UP", "DOWN", "SELECT", "RETRO_ON", "RETRO_OFF"]
 axis = ["STEERING", "ACCELERATOR", "BRAKE"]
-option = ["Regolazione massima velocità", 
-          "Regolazione angolo massimo sterzo", 
+option = ["Regolazione massima velocità",
+          "Regolazione angolo massimo sterzo",
           "Reset mappatura tasti"]
 
 class Volante():
@@ -53,14 +53,14 @@ class Volante():
         self.settings = False
         self.selectItem = False
         self.retromarcia = False
-    
+
     def run(self):
         while self.running:
             for event in pygame.event.get():
                 self.gestioneUscite(event)
                 self.gestioneBottoni(event)
                 self.gestioneAssi(event)
-        
+
         pygame.quit()
 
     def gestioneUscite(self, event):
@@ -74,20 +74,20 @@ class Volante():
     def gestioneBottoni(self, event):
         if event.type != pygame.JOYBUTTONDOWN:
             return
-        
+
         print(f"Pulsante premuto: {event.button}")
-        
+
         if event.button == self.buttons["RETRO_ON"]:
             self.retromarcia = True
             print(Fore.GREEN + "Retromarcia inserita." + Style.RESET_ALL)
-            
+
         if event.button == self.buttons["RETRO_OFF"]:
             self.retromarcia = False
             print(Fore.GREEN + "Retromarcia disinserita." + Style.RESET_ALL)
 
         if event.button == self.buttons["START"]:
             self.gestioneInizio()
-        
+
         if event.button == self.buttons["EXIT"]:
             self.gestioneUsciteBottoni()
 
@@ -96,7 +96,7 @@ class Volante():
 
         if self.settings:
             self.gestioneBottoniImpostazioni(event)
-    
+
     def gestioneAssi(self, event):
         if event.type != pygame.JOYAXISMOTION:
             return
@@ -106,7 +106,7 @@ class Volante():
                 self.position, self.velocity = settingOption(event.value, self.position, 100, 0, self.velocity, self.selected, 0, 5, self.option_selected)
             if self.selected == 1:
                 self.position, self.angle = settingOption(event.value, self.position, 180, 0, self.angle, self.selected, 1, 9, self.option_selected)
-        
+
         if self.start:
             self.invioDati()
 
@@ -117,15 +117,15 @@ class Volante():
             print("Avvio del veicolo...")
             self.start == True
             drawMenu()
-        
+
         elif not self.start:
             drawMenu()
             self.start = True
-        
+
         else:
             self.start = False
             drawMenu()
-    
+
     def gestioneUsciteBottoni(self):
         if not self.start and not self.settings:
             print(Fore.GREEN + "Exit selezionato. Uscita dal programma." + Style.RESET_ALL)
@@ -137,14 +137,14 @@ class Volante():
                 "velocity": self.velocity,
                 "angle": self.angle
             })
-            pachet = json.dumps(self.dataSetting)
+            packet = json.dumps(self.dataSetting)
             drawMenu()
-            
+
     def gestioneImpostazioni(self):
         self.settings = True
         self.selected = 0
         drawSettings(self.selected, self.option_selected)
-    
+
     def gestioneBottoniImpostazioni(self, event):
         if event.button == self.buttons["UP"]:
             self.selectItem = False
@@ -158,7 +158,7 @@ class Volante():
 
         if event.button == self.buttons["SELECT"]:
             self.gestioneOpzioniImpostazioni()
-    
+
     def gestioneOpzioniImpostazioni(self):
         self.positionNow = 0
 
@@ -199,11 +199,11 @@ class Volante():
             "freno": round(self.js.get_axis(self.axis["BRAKE"]), 2),
         })
 
-        pachet = json.dumps(self.data)
+        packet = json.dumps(self.data)
         showInfo(
             self.data["volante"],
             self.data["acceleratore"],
             self.data["freno"]
         )
 
-            
+
