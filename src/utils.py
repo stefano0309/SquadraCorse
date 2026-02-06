@@ -27,6 +27,7 @@ def buttonMap(button, axis, path):
             btnValue = input(f"{btn}: ")
             if btnValue == "":
                 btnValue = presetButton[idx]
+                print("Caricato preset con id", presetButton[idx])
             dataButton.update({
                 btn: btnValue
             })
@@ -35,6 +36,7 @@ def buttonMap(button, axis, path):
             axisValue = input(f"{x}: ")
             if axisValue == "":
                 axisValue = presetAxis[idx]
+                print("Caricato preset con id", presetAxis[idx])
             dataAxis.update({
                 x: axisValue
             })
@@ -120,3 +122,7 @@ def drawSettingOption(min, max, var, subdivision):
 def showInfo(volante, acceleratore, freno):
     print("VOLANTE: "+str(volante), "ACCELERATORE: "+str(acceleratore), "FRENO: "+ str(freno))
         
+def loadPreset(path):
+    files = os.listdir(path)
+    for file in files:
+        print(os.path.join(path,file))

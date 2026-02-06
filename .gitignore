@@ -6,3 +6,4 @@ dist/
 build/
 *.log
 config.json
+preset/

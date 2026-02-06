@@ -1,5 +1,7 @@
 from src.obj import Volante
+from src.utils import loadPreset
 
 if __name__ == "__main__":
-    app = Volante()
-    app.run()
+    loadPreset("preset")
+    #app = Volante()
+    #app.run()
