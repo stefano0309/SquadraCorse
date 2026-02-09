@@ -194,7 +194,7 @@ class Controller():
                     self.settings = False
                     drawMenu()
                 if self.selected == 3:
-                    self.preset = createPreset(self.velocity, self.angle)
+                    self.preset = presetMenu(self.paths["presetIndex"], self.paths["presetPath"], self.velocity, self.angle)
 
             else:
                 print(f"\t{idx}. {option}")
