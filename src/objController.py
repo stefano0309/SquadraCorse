@@ -12,7 +12,7 @@ option = ["Regolazione massima velocità",
           "Regolazione angolo massimo sterzo", 
           "Reset mappatura tasti"]
 
-class Volante():
+class Controller():
     def __init__(self):
         pygame.init()
         pygame.joystick.init()
@@ -206,4 +206,4 @@ class Volante():
             self.data["freno"]
         )
 
-            
+

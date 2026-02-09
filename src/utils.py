@@ -123,6 +123,14 @@ def showInfo(volante, acceleratore, freno):
     print("VOLANTE: "+str(volante), "ACCELERATORE: "+str(acceleratore), "FRENO: "+ str(freno))
         
 def loadPreset(path):
+    print(Fore.YELLOW + "Menu Preset" + Style.RESET_ALL)
     files = os.listdir(path)
     for file in files:
         print(os.path.join(path,file))
+
+
+def INIZIALISE_DEBUG():
+    print(Fore.CYAN + "MODALITÀ DEBUG TASTIERA" + Style.RESET_ALL)
+    print("\t- Volante: SIMULATO (WASD)")
+    print("\t- Pulsanti: SIMULATI (S, P, Invio, Backspace, R, F)")
+    print(Fore.YELLOW + "\nPREMI 'S' PER INIZIARE" + Style.RESET_ALL)

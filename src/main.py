@@ -1,7 +1,10 @@
-from src.obj import Volante
-from src.utils import loadPreset
+from src.objController import *
+from src.objControllerDebug import *
 
 if __name__ == "__main__":
-    loadPreset("preset")
-    #app = Volante()
-    #app.run()
+    if input("Tipo di input:\n1. Volante\n2. Debug con tastiera\nSCELTA-> ") == 1:
+        app = Controller()
+        app.run()
+    else:
+        app = ControllerDebug()
+        app.run()
