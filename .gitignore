@@ -5,5 +5,4 @@ __pycache__/
 dist/
 build/
 *.log
-config.json
-preset/
+data/

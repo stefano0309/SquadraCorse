@@ -5,12 +5,12 @@ from src.utils import *
 
 init(autoreset=True)
 
-path = "./config.json"
 button = ["START", "EXIT", "SETTINGS", "UP", "DOWN", "SELECT", "RETRO_ON", "RETRO_OFF"]
 axis = ["STEERING", "ACCELERATOR", "BRAKE"]
 option = ["Regolazione massima velocità", 
           "Regolazione angolo massimo sterzo", 
-          "Reset mappatura tasti"]
+          "Reset mappatura tasti",
+          "Salva preset impostazioni"]
 
 class Controller():
     def __init__(self):
@@ -23,15 +23,23 @@ class Controller():
             quit()
 
         self.js = pygame.joystick.Joystick(0)
+        
 
-        buttonMap(button, axis, path)
-        buttonMp, axisMp = loadMap(path)
+        PATHS, BUTTON, AXIS = loadWorkSpace()
+        presetMenu(PATHS["presetIndex"], PATHS["presetPath"])
+        self.paths = PATHS
+        self.presetButton = BUTTON
+        self.presetAxis = AXIS
+
+        buttonMap(self.presetButton, self.presetAxis, button, axis, self.paths["configPath"])
+        buttonMp, axisMp = loadMap(self.paths["configPath"])
 
         INIZIALISE(self.js)
 
         #Dati
         self.data = {}
         self.dataSetting = {}
+        self.preset = 0
 
         #Stato veicolo
         self.velocity = 50
@@ -179,12 +187,14 @@ class Controller():
                     drawSettingOption(0, 180, self.angle, 9)
                 if self.selected == 2:
                     CLEAR()
-                    os.remove(path)
-                    buttonMap(button, axis, path)
-                    self.buttons, self.axis = loadMap(path)
+                    os.remove(self.paths["configPath"])
+                    buttonMap(self.presetButton, self.presetAxis, button, axis, self.paths["configPath"])
+                    self.buttons, self.axis = loadMap(self.paths["configPath"])
                     CLEAR()
                     self.settings = False
                     drawMenu()
+                if self.selected == 3:
+                    self.preset = createPreset(self.velocity, self.angle)
 
             else:
                 print(f"\t{idx}. {option}")

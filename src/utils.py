@@ -1,11 +1,168 @@
 import os
 from colorama import * 
+from datetime import *
 import json
 
 #---- Funzioni setUp ----
 
-presetButton = ["12","5","3","0","1","4","9","8"]
-presetAxis = ["0","5","1"]
+def setUpWorkSpace():
+    path = os.getcwd()+"\\src"
+    if not os.path.exists(path+"\\data"):
+        print(Fore.YELLOW + "Setting up workspace" + Style.RESET_ALL)
+        os.makedirs(path+"\\data")
+        os.makedirs(path+"\\data\\preset")
+        with open(path+"\\data\\preset\\preset0.json", "w") as f:
+            data = {
+                "maxVel": 50,
+                "maxAngle": 45
+            }
+            json.dump(data, f, indent=4)
+
+        with open(path+"\\data\\preset\\indexPreset.json", "w") as f:
+            data = {
+                "presetNames": ["start"],
+                "preset": "start"
+            }
+            json.dump(data, f, indent=4)
+
+        with open(path+"\\data\\setting.json", "w") as f:
+            data = {
+                "dateTime": str(datetime.now()),
+                "paths": {
+                    "homePath": path,
+                    "dataPath": path+"\\data",
+                    "settingPath": path+"\\data\\setting.json",
+                    "presetPath": path+"\\data\\preset",
+                    "presetIndex": path+"\\data\\preset\\indexPreset.json",
+                    "configPath": path+"\\data\\config.json"
+                },
+                "presetButton": ["12","5","3","0","1","4","9","8"],
+                "presetAxis": ["0","5","1"]
+            }
+            json.dump(data, f, indent=4)
+
+
+
+def loadWorkSpace():
+    setUpWorkSpace()
+    with open(os.getcwd()+"\\src\\data\\setting.json") as f:
+        data = json.load(f)
+        PATHS = data["paths"]
+        BUTTON = data["presetButton"]
+        AXIS = data["presetAxis"]
+    return PATHS, BUTTON, AXIS
+
+
+def presetMenu(presetIndex, presetPath, vel=50, angle=45):
+    CLEAR()
+    print(Fore.YELLOW + "Caricamento opzioni per il PRESET" + Style.RESET_ALL)
+    print("\t1. Salvataggio preset\n\t2. Crea un preset\n\t3. Carica un preset")
+    x = int(input("Opzione -> "))
+    if x==1:
+        savePreset(presetIndex, presetPath, vel, angle)
+    elif x ==2:
+        createPreset(presetIndex, presetPath, vel, angle)
+    else:
+        loadPreset(presetIndex, presetPath)
+
+def savePreset(presetIndex, presetPath, vel , angle):
+    CLEAR()
+    print(Fore.YELLOW + "Salvataggio del preset con le impostazioni attuali" + Style.RESET_ALL)
+    with open(presetIndex, "r") as f:
+        data = json.load(f)
+        index = data["presetNames"].index(data["preset"])
+    with open(presetPath+f"\\preset{index}.json", "w") as f:
+        data = {
+            "maxVel": vel,
+            "maxAngle": angle
+        }
+        json.dump(data, f)
+
+def createPreset(presetIndex, presetPath, vel, angle):
+    CLEAR()
+    print(Fore.YELLOW + "Creazione di un preset in input/per impostazioni" + Style.RESET_ALL)
+    with open(presetIndex, "r") as f:
+        data = json.load(f)
+        names = data["presetNames"]
+        nameNow = data["preset"]
+    
+    name = input("Inserisci il nome del preset: ").lower()
+    useName = True if name in names else False
+    while useName:
+        name = input("Inserisci il nome del preset: ").lower()
+        useName = True if name in names else False
+    names.append(name)
+
+    index=len(names)-1
+
+    usePreset = True if input("Vuoi usare questo preset da subito (y/n): ").lower() == "y" else False
+    useInputs = True if input("Vuoi inserire i valori manualmente (y/n): ").lower() == "y" else False
+
+    if useInputs:
+        vel = int(input("Inserisci la velocità (1-100): "))
+        while(vel<1 or vel>100):
+            vel = int(input("Inserisci la velocità (1-100): "))
+        angle = int(input("Inserisci angolo: "))
+        while(angle<1 or angle>180):
+             angle = int(input("Inserisci angolo: "))
+
+    if usePreset:
+        with open(presetIndex, "w") as f:
+            data = {
+                "presetNames": names,
+                "preset": name
+            }
+
+            json.dump(data, f, indent=4)
+    else:
+        with open(presetIndex, "w") as f:
+            data = {
+                "presetNames": names,
+                "preset": nameNow
+            }
+
+            json.dump(data, f, indent=4)
+    
+    with open(presetPath+f"\\preset{index}.json", "w") as f:
+        data = {
+            "maxVel": vel,
+            "maxAngle": angle
+        }
+        json.dump(data, f, indent=4)
+
+def loadPreset(presetIndex, presetPath):
+    CLEAR()
+    with open(presetIndex, "r") as f:
+        data = json.load(f)
+        names = data["presetNames"]
+    print(Fore.YELLOW + "Preset possibili:")
+    for x, name in enumerate(names):
+        print(f"\t{x}. {name.capitalize()}")
+    x = int(input(Fore.CYAN + "\tInserisci il numero del preset che vuoi caricare: " + Style.RESET_ALL))
+    while(x<0 or x>len(name)-1):
+        x = int(input(Fore.CYAN + "\tInserisci il numero del preset che vuoi caricare: " + Style.RESET_ALL))
+
+    with open(presetIndex, "w") as f:
+        data = {
+            "presetNames":names,
+            "preset": names[x]
+        }
+        json.dump(data, f, indent=4)
+    print(Fore.YELLOW + "Caricamento del preset selezionato" + Style.RESET_ALL)
+    vel, angle = reloadPreset(presetIndex, presetPath, names[x])
+    print("Nome: " + Fore.CYAN + names[x].capitalize()+":" + Style.RESET_ALL +f"\n\t-Velocità: {vel}\n\t-Angolo: {angle}")
+    return vel, angle
+
+def reloadPreset(presetIndex, presetPath, name):
+    with open(presetIndex, "r") as f:
+        data = json.load(f)
+        index = data["presetNames"].index(data["preset"])
+    with open(presetPath+f"\\preset{index}.json", "r") as f:
+        data = json.load(f)
+        vel = data["maxVel"]
+        angle = data["maxAngle"]
+    return vel, angle    
+
 
 def configMenu(path):
     print(Fore.YELLOW + "Menu di configurazione:" + Style.RESET_ALL)
@@ -16,7 +173,7 @@ def configMenu(path):
         print(Fore.YELLOW + "\nCreazione di una configurazione:")
         print("Configurazione:\n\t- Se il campo e vuoto viene caricato un preset\n\t- Se inserisci un valore verra creata una configurazione personalizata")
         
-def buttonMap(button, axis, path):
+def buttonMap(presetButton, presetAxis, button, axis, path):
     dataButton = {}
     dataAxis = {}
     data = {}
@@ -44,7 +201,7 @@ def buttonMap(button, axis, path):
             "button": dataButton,
             "axis": dataAxis
         })
-        with open("config.json", mode="w") as f:
+        with open(path, mode="w") as f:
             json.dump(data, f, indent=4)
 
 def loadMap(path):
@@ -122,11 +279,7 @@ def drawSettingOption(min, max, var, subdivision):
 def showInfo(volante, acceleratore, freno):
     print("VOLANTE: "+str(volante), "ACCELERATORE: "+str(acceleratore), "FRENO: "+ str(freno))
         
-def loadPreset(path):
-    print(Fore.YELLOW + "Menu Preset" + Style.RESET_ALL)
-    files = os.listdir(path)
-    for file in files:
-        print(os.path.join(path,file))
+
 
 
 def INIZIALISE_DEBUG():
@@ -134,3 +287,4 @@ def INIZIALISE_DEBUG():
     print("\t- Volante: SIMULATO (WASD)")
     print("\t- Pulsanti: SIMULATI (S, P, Invio, Backspace, R, F)")
     print(Fore.YELLOW + "\nPREMI 'S' PER INIZIARE" + Style.RESET_ALL)
+    
