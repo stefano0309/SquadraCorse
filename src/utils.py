@@ -41,7 +41,7 @@ def setUpWorkSpace():
             }
             json.dump(data, f, indent=4)
 
-
+#--- Funzioni di preset ---
 
 def loadWorkSpace():
     setUpWorkSpace()
@@ -278,13 +278,4 @@ def drawSettingOption(min, max, var, subdivision):
 
 def showInfo(volante, acceleratore, freno):
     print("VOLANTE: "+str(volante), "ACCELERATORE: "+str(acceleratore), "FRENO: "+ str(freno))
-        
-
-
-
-def INIZIALISE_DEBUG():
-    print(Fore.CYAN + "MODALITÀ DEBUG TASTIERA" + Style.RESET_ALL)
-    print("\t- Volante: SIMULATO (WASD)")
-    print("\t- Pulsanti: SIMULATI (S, P, Invio, Backspace, R, F)")
-    print(Fore.YELLOW + "\nPREMI 'S' PER INIZIARE" + Style.RESET_ALL)
-    
+            
