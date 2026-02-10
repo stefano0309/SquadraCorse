@@ -1,2 +1,4 @@
 colorama
 pygame-ce
+adafruit-blinka
+adafruit-circuitpython-nrf24l01
