@@ -2,6 +2,7 @@ import pygame
 import json
 from colorama import *
 from src.utils import *
+import serial
 
 init(autoreset=True)
 
@@ -24,6 +25,12 @@ class Controller():
 
         self.js = pygame.joystick.Joystick(0)
         
+        # Inizializza la seriale (cambia porta e baudrate secondo necessità)
+        try:
+            self.ser = serial.Serial('COM3', 115200, timeout=1)
+        except:
+            print("Porta seriale non trovata!")
+            self.ser = None
 
         PATHS, BUTTON, AXIS = loadWorkSpace()
         presetMenu(PATHS["presetIndex"], PATHS["presetPath"])
@@ -203,17 +210,31 @@ class Controller():
             print(Fore.RED + "Premi X per tornare al menu principale.")
 
     def invioDati(self):
+        # Aggiornamento del dizionario con i dati del joystick
         self.data.update({
             "volante": round(self.js.get_axis(self.axis["STEERING"]), 2),
             "acceleratore": round(self.js.get_axis(self.axis["ACCELERATOR"]), 2),
             "freno": round(self.js.get_axis(self.axis["BRAKE"]), 2),
         })
 
-        pachet = json.dumps(self.data)
+        # Visualizzazione a schermo (tua funzione esistente)
         showInfo(
             self.data["volante"],
             self.data["acceleratore"],
             self.data["freno"]
         )
+
+        # --- LOGICA DI INVIO SERIALE ---
+        try:
+            # Serializzazione in formato JSON
+            # Uso separators per rendere il pacchetto più leggero
+            packet = json.dumps(self.data, separators=(',', ':'))
+            
+            # Invio sulla porta seriale con terminatore \n
+            # self.ser deve essere l'istanza di serial.Serial definita nel tuo __init__
+            self.ser.write((packet + '\n').encode('utf-8'))
+            
+        except Exception as e:
+            print(f"Errore durante l'invio seriale: {e}")
 
 

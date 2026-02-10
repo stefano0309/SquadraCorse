@@ -3,6 +3,7 @@ from colorama import *
 from datetime import *
 import json
 
+
 #---- Funzioni setUp ----
 
 def setUpWorkSpace():
@@ -279,3 +280,29 @@ def drawSettingOption(min, max, var, subdivision):
 def showInfo(volante, acceleratore, freno):
     print("VOLANTE: "+str(volante), "ACCELERATORE: "+str(acceleratore), "FRENO: "+ str(freno))
             
+def send_dict_serial(ser_connection, data_dict):
+    """
+    Serializza un dizionario in JSON e lo invia tramite porta seriale.
+    
+    :param ser_connection: Oggetto serial.Serial aperto
+    :param data_dict: Il dizionario da inviare
+    :return: True se l'invio è riuscito, False altrimenti
+    """
+    try:
+        # 1. Converte il dizionario in stringa JSON compatta
+        # separators=(',', ':') rimuove gli spazi inutili per risparmiare banda
+        json_data = json.dumps(data_dict, separators=(',', ':'))
+        
+        # 2. Aggiunge il terminatore di riga e codifica in byte
+        message = (json_data + '\n').encode('utf-8')
+        
+        # 3. Invia sulla porta
+        ser_connection.write(message)
+        
+        # Opzionale: assicura che i dati vengano effettivamente trasmessi
+        ser_connection.flush()
+        
+        return True
+    except Exception as e:
+        print(f"Errore durante l'invio seriale: {e}")
+        return False
