@@ -26,12 +26,7 @@ class Controller():
         self.js = pygame.joystick.Joystick(0)
         
         # Inizializza la seriale (cambia porta e baudrate secondo necessità)
-        try:
-            # Solitamente è ttyACM0 o ttyUSB0
-            self.ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
-        except:
-            print("Porta seriale non trovata!")
-            self.ser = None
+       
 
         PATHS, BUTTON, AXIS = loadWorkSpace()
         presetMenu(PATHS["presetIndex"], PATHS["presetPath"])
@@ -43,7 +38,12 @@ class Controller():
         buttonMp, axisMp = loadMap(self.paths["configPath"])
 
         INIZIALISE(self.js)
-
+        try:
+            # Solitamente è ttyACM0 o ttyUSB0
+            self.ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
+        except:
+            print("Porta seriale non trovata!")
+            self.ser = None
         #Dati
         self.data = {}
         self.dataSetting = {}
