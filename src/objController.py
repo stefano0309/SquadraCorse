@@ -27,7 +27,8 @@ class Controller():
         
         # Inizializza la seriale (cambia porta e baudrate secondo necessità)
         try:
-            self.ser = serial.Serial('COM3', 115200, timeout=1)
+            # Solitamente è ttyACM0 o ttyUSB0
+            self.ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
         except:
             print("Porta seriale non trovata!")
             self.ser = None
