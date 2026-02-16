@@ -1,5 +1,10 @@
 import json
-from config import MAPPING_FILE
+import pathlib
+
+with open(pathlib.Path(__file__).parent / "config.json") as f:
+    config = json.load(f)
+
+MAPPING_FILE = pathlib.Path(__file__).parent / config['MAPPING_FILE']
 
 # ══════════════ MAPPING ══════════════
 def load_mapping() -> dict | None:

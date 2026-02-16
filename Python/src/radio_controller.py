@@ -1,7 +1,17 @@
 import serial
 import struct
 import time
-from config import SERIAL_BAUD, DEFAULT_SEND_RATE, BINARY_MARKER
+import json
+import pathlib
+
+with open(pathlib.Path(__file__).parent / "config.json") as f:
+    config = json.load(f)
+
+SERIAL_BAUD = config['SERIAL_BAUD']
+DEFAULT_SEND_RATE = config['DEFAULT_SEND_RATE']
+BINARY_MARKER = config['BINARY_MARKER']
+DEFAULT_TX_POWER = config['DEFAULT_TX_POWER']
+
 from crc import crc16_ccitt
 
 # ══════════════ RADIO CONTROLLER ══════════════
@@ -10,7 +20,7 @@ class RadioController:
         self.ser: serial.Serial | None = None
         self.module = "UNKNOWN"
         self.send_rate = DEFAULT_SEND_RATE
-        self.tx_power = 20
+        self.tx_power = DEFAULT_TX_POWER
         self.connected = False
         self.tx_count = 0
         self.tx_fail = 0
@@ -48,6 +58,7 @@ class RadioController:
         resp = self.send_command("HANDSHAKE")
         if resp and resp.startswith("ACK"):
             self._parse_status(resp.split())
+            self.set_tx_power(DEFAULT_TX_POWER)
             return True
         return False
 

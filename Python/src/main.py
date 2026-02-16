@@ -2,8 +2,16 @@ import pygame
 import time
 import sys
 import argparse
+import json
+import pathlib
 
-from config import SERIAL_BAUD, MAX_SPEEDS, DISPLAY_REFRESH_S
+with open(pathlib.Path(__file__).parent / "config.json") as f:
+    config = json.load(f)
+
+SERIAL_BAUD = config['SERIAL_BAUD']
+MAX_SPEEDS = config['MAX_SPEEDS']
+DISPLAY_REFRESH_S = config['DISPLAY_REFRESH_S']
+
 from utils import clear_once
 from mapping import load_mapping, save_mapping
 from radio_controller import RadioController
