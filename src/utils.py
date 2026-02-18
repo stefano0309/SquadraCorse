@@ -44,125 +44,107 @@ def setUpWorkSpace():
 
 #--- Funzioni di preset ---
 
+def readfile(path):
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return data
+
+def writefile(path, data):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
+
 def loadWorkSpace():
     setUpWorkSpace()
-    with open(os.getcwd()+"\\src\\data\\setting.json") as f:
-        data = json.load(f)
-        PATHS = data["paths"]
-        BUTTON = data["presetButton"]
-        AXIS = data["presetAxis"]
+    data = readfile(os.getcwd()+"\\src\\data\\setting.json")
+    PATHS = data["paths"]
+    BUTTON = data["presetButton"]
+    AXIS = data["presetAxis"]
     return PATHS, BUTTON, AXIS
 
 
+# Funzione helper per validare gli input numerici
+def get_int_input(prompt, min_val, max_val):
+    while True:
+        try:
+            val = int(input(prompt))
+            if min_val <= val <= max_val:
+                return val
+        except ValueError:
+            pass
+        print(f"Errore: inserire un numero tra {min_val} e {max_val}")
+
 def presetMenu(presetIndex, presetPath, vel=50, angle=45):
     CLEAR()
-    print(Fore.YELLOW + "Caricamento opzioni per il PRESET" + Style.RESET_ALL)
-    print("\t1. Salvataggio preset\n\t2. Crea un preset\n\t3. Carica un preset")
-    x = int(input("Opzione -> "))
-    if x==1:
+    print(Fore.YELLOW + "Gestione PRESET" + Style.RESET_ALL)
+    print("\t1. Salva attuale\n\t2. Crea nuovo\n\t3. Carica esistente")
+    
+    scelta = get_int_input("Opzione -> ", 1, 3)
+    
+    if scelta == 1:
         savePreset(presetIndex, presetPath, vel, angle)
-    elif x ==2:
+    elif scelta == 2:
         createPreset(presetIndex, presetPath, vel, angle)
     else:
-        loadPreset(presetIndex, presetPath)
+        return loadPreset(presetIndex, presetPath)
 
-def savePreset(presetIndex, presetPath, vel , angle):
-    CLEAR()
-    print(Fore.YELLOW + "Salvataggio del preset con le impostazioni attuali" + Style.RESET_ALL)
-    with open(presetIndex, "r") as f:
-        data = json.load(f)
-        index = data["presetNames"].index(data["preset"])
-    with open(presetPath+f"\\preset{index}.json", "w") as f:
-        data = {
-            "maxVel": vel,
-            "maxAngle": angle
-        }
-        json.dump(data, f)
+def savePreset(presetIndex, presetPath, vel, angle):
+    data = readfile(presetIndex)
+    index = data["presetNames"].index(data["preset"])
+    
+    payload = {"maxVel": vel, "maxAngle": angle}
+    writefile(f"{presetPath}\\preset{index}.json", payload)
+    print(Fore.GREEN + "Preset salvato correttamente!" + Style.RESET_ALL)
 
 def createPreset(presetIndex, presetPath, vel, angle):
     CLEAR()
-    print(Fore.YELLOW + "Creazione di un preset in input/per impostazioni" + Style.RESET_ALL)
-    with open(presetIndex, "r") as f:
-        data = json.load(f)
-        names = data["presetNames"]
-        nameNow = data["preset"]
+    data = readfile(presetIndex)
+    names = data["presetNames"]
+
+    # Validazione nome unico
+    name = ""
+    while not name or name in names:
+        name = input("Inserisci un nome univoco per il preset: ").lower().strip()
     
-    name = input("Inserisci il nome del preset: ").lower()
-    useName = True if name in names else False
-    while useName:
-        name = input("Inserisci il nome del preset: ").lower()
-        useName = True if name in names else False
     names.append(name)
-
-    index=len(names)-1
-
-    usePreset = True if input("Vuoi usare questo preset da subito (y/n): ").lower() == "y" else False
-    useInputs = True if input("Vuoi inserire i valori manualmente (y/n): ").lower() == "y" else False
-
-    if useInputs:
-        vel = int(input("Inserisci la velocità (1-100): "))
-        while(vel<1 or vel>100):
-            vel = int(input("Inserisci la velocità (1-100): "))
-        angle = int(input("Inserisci angolo: "))
-        while(angle<1 or angle>180):
-             angle = int(input("Inserisci angolo: "))
-
-    if usePreset:
-        with open(presetIndex, "w") as f:
-            data = {
-                "presetNames": names,
-                "preset": name
-            }
-
-            json.dump(data, f, indent=4)
-    else:
-        with open(presetIndex, "w") as f:
-            data = {
-                "presetNames": names,
-                "preset": nameNow
-            }
-
-            json.dump(data, f, indent=4)
     
-    with open(presetPath+f"\\preset{index}.json", "w") as f:
-        data = {
-            "maxVel": vel,
-            "maxAngle": angle
-        }
-        json.dump(data, f, indent=4)
+    if input("Vuoi inserire i valori manualmente? (y/n): ").lower() == "y":
+        vel = get_int_input("Velocità (1-100): ", 1, 100)
+        angle = get_int_input("Angolo (1-180): ", 1, 180)
+
+    # Aggiorna indice nomi
+    use_now = input("Usare subito questo preset? (y/n): ").lower() == "y"
+    data["preset"] = name if use_now else data["preset"]
+    writefile(presetIndex, data)
+
+    # Salva file fisico del preset
+    save_data = {"maxVel": vel, "maxAngle": angle}
+    writefile(f"{presetPath}\\preset{len(names)-1}.json", save_data)
 
 def loadPreset(presetIndex, presetPath):
-    CLEAR()
-    with open(presetIndex, "r") as f:
-        data = json.load(f)
-        names = data["presetNames"]
-    print(Fore.YELLOW + "Preset possibili:")
-    for x, name in enumerate(names):
-        print(f"\t{x}. {name.capitalize()}")
-    x = int(input(Fore.CYAN + "\tInserisci il numero del preset che vuoi caricare: " + Style.RESET_ALL))
-    while(x<0 or x>len(name)-1):
-        x = int(input(Fore.CYAN + "\tInserisci il numero del preset che vuoi caricare: " + Style.RESET_ALL))
+    data = readfile(presetIndex)
+    names = data["presetNames"]
 
-    with open(presetIndex, "w") as f:
-        data = {
-            "presetNames":names,
-            "preset": names[x]
-        }
-        json.dump(data, f, indent=4)
-    print(Fore.YELLOW + "Caricamento del preset selezionato" + Style.RESET_ALL)
-    vel, angle = reloadPreset(presetIndex, presetPath, names[x])
-    print("Nome: " + Fore.CYAN + names[x].capitalize()+":" + Style.RESET_ALL +f"\n\t-Velocità: {vel}\n\t-Angolo: {angle}")
+    print(Fore.YELLOW + "Preset disponibili:")
+    for i, name in enumerate(names):
+        print(f"\t{i}. {name.capitalize()}")
+
+    idx = get_int_input("\tScegli il numero del preset: ", 0, len(names) - 1)
+    
+    # Aggiorna il preset attivo nel file indice
+    data["preset"] = names[idx]
+    writefile(presetIndex, data)
+
+    # Carica i valori reali
+    vel, angle = reloadPreset(presetIndex, presetPath)
+    print(f"Caricato: {names[idx].upper()} (Vel: {vel}, Angolo: {angle})")
     return vel, angle
 
-def reloadPreset(presetIndex, presetPath, name):
-    with open(presetIndex, "r") as f:
-        data = json.load(f)
-        index = data["presetNames"].index(data["preset"])
-    with open(presetPath+f"\\preset{index}.json", "r") as f:
-        data = json.load(f)
-        vel = data["maxVel"]
-        angle = data["maxAngle"]
-    return vel, angle    
+def reloadPreset(presetIndex, presetPath):
+    data_idx = readfile(presetIndex)
+    idx = data_idx["presetNames"].index(data_idx["preset"])
+    
+    preset_data = readfile(f"{presetPath}\\preset{idx}.json")
+    return preset_data["maxVel"], preset_data["maxAngle"]
 
 
 def configMenu(path):
@@ -280,29 +262,3 @@ def drawSettingOption(min, max, var, subdivision):
 def showInfo(volante, acceleratore, freno):
     print("VOLANTE: "+str(volante), "ACCELERATORE: "+str(acceleratore), "FRENO: "+ str(freno))
             
-def send_dict_serial(ser_connection, data_dict):
-    """
-    Serializza un dizionario in JSON e lo invia tramite porta seriale.
-    
-    :param ser_connection: Oggetto serial.Serial aperto
-    :param data_dict: Il dizionario da inviare
-    :return: True se l'invio è riuscito, False altrimenti
-    """
-    try:
-        # 1. Converte il dizionario in stringa JSON compatta
-        # separators=(',', ':') rimuove gli spazi inutili per risparmiare banda
-        json_data = json.dumps(data_dict, separators=(',', ':'))
-        
-        # 2. Aggiunge il terminatore di riga e codifica in byte
-        message = (json_data + '\n').encode('utf-8')
-        
-        # 3. Invia sulla porta
-        ser_connection.write(message)
-        
-        # Opzionale: assicura che i dati vengano effettivamente trasmessi
-        ser_connection.flush()
-        
-        return True
-    except Exception as e:
-        print(f"Errore durante l'invio seriale: {e}")
-        return False

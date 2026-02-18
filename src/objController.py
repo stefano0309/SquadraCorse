@@ -2,7 +2,6 @@ import pygame
 import json
 from colorama import *
 from src.utils import *
-import serial
 
 init(autoreset=True)
 
@@ -38,12 +37,7 @@ class Controller():
         buttonMp, axisMp = loadMap(self.paths["configPath"])
 
         INIZIALISE(self.js)
-        try:
-            # Solitamente è ttyACM0 o ttyUSB0
-            self.ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
-        except:
-            print("Porta seriale non trovata!")
-            self.ser = None
+        
         #Dati
         self.data = {}
         self.dataSetting = {}
@@ -224,18 +218,4 @@ class Controller():
             self.data["acceleratore"],
             self.data["freno"]
         )
-
-        # --- LOGICA DI INVIO SERIALE ---
-        try:
-            # Serializzazione in formato JSON
-            # Uso separators per rendere il pacchetto più leggero
-            packet = json.dumps(self.data, separators=(',', ':'))
-            
-            # Invio sulla porta seriale con terminatore \n
-            # self.ser deve essere l'istanza di serial.Serial definita nel tuo __init__
-            self.ser.write((packet + '\n').encode('utf-8'))
-            
-        except Exception as e:
-            print(f"Errore durante l'invio seriale: {e}")
-
 
