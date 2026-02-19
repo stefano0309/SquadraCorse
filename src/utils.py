@@ -282,7 +282,7 @@ def genera_pacchetto(steer, accel, brake, speed_sel, reverse, commands=0):
     Comprime i dati nel formato binario richiesto dal protocollo.
     """
     # Clipping dei valori (0-255 per gli assi, 0-15 per le marce)
-    steer = max(0, min(255, int(steer * 127.5)))
+    steer_byte = max(0, min(255, int(round((steer + 1.0) * 127.5))))
     accel = max(0, min(255, int(accel)))
     brake = max(0, min(255, int(brake)))
     speed_sel = max(0, min(15, int(speed_sel)))
@@ -291,7 +291,7 @@ def genera_pacchetto(steer, accel, brake, speed_sel, reverse, commands=0):
     misc = ((speed_sel & 0x0F) << 4) | ((1 if reverse else 0) << 3) | (commands & 0x07)
     
     # Composizione del payload e calcolo checksum
-    payload = bytes([steer, accel, brake, misc]) 
+    payload = bytes([steer_byte, accel, brake, misc]) 
     crc = crc16_ccitt(payload)
     
     # Frame finale: Marker + Payload + CRC (2 byte Big Endian)
