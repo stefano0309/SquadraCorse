@@ -2,6 +2,10 @@ import os
 from colorama import * 
 from datetime import *
 import json
+from art import *
+import struct
+      
+BINARY_MARKER = 170
 
 
 #---- Funzioni setUp ----
@@ -200,6 +204,7 @@ def CLEAR():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def INIZIALISE(js):
+    print(text2art("Squadra Corse", font="small"))
     print(Fore.YELLOW + "Controller connesso correttamente:" + Style.RESET_ALL)
     print(f"\t- Volante rilevato: {js.get_name()}")
     print(f"\t- Numero di pulsanti: {js.get_numbuttons()}")
@@ -262,3 +267,32 @@ def drawSettingOption(min, max, var, subdivision):
 def showInfo(volante, acceleratore, freno):
     print("VOLANTE: "+str(volante), "ACCELERATORE: "+str(acceleratore), "FRENO: "+ str(freno))
             
+def crc16_ccitt(data: bytes) -> int:
+    """Calcola il checksum CRC-16 CCITT necessario per l'integrità del pacchetto."""
+    crc = 0xFFFF
+    for b in data:
+        crc ^= b << 8
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x1021) if (crc & 0x8000) else (crc << 1)
+            crc &= 0xFFFF
+    return crc #
+
+def genera_pacchetto(steer, accel, brake, speed_sel, reverse, commands=0):
+    """
+    Comprime i dati nel formato binario richiesto dal protocollo.
+    """
+    # Clipping dei valori (0-255 per gli assi, 0-15 per le marce)
+    steer = max(0, min(255, int(steer)))
+    accel = max(0, min(255, int(accel)))
+    brake = max(0, min(255, int(brake)))
+    speed_sel = max(0, min(15, int(speed_sel)))
+    
+    # Costruzione del byte 'misc': [Marcia(4bit) | Retro(1bit) | Comandi(3bit)]
+    misc = ((speed_sel & 0x0F) << 4) | ((1 if reverse else 0) << 3) | (commands & 0x07)
+    
+    # Composizione del payload e calcolo checksum
+    payload = bytes([steer, accel, brake, misc])
+    crc = crc16_ccitt(payload)
+    
+    # Frame finale: Marker + Payload + CRC (2 byte Big Endian)
+    return bytes([BINARY_MARKER]) + payload + struct.pack(">H", crc)

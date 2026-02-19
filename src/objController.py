@@ -1,5 +1,6 @@
 import pygame
 import json
+import serial
 from colorama import *
 from src.utils import *
 
@@ -12,6 +13,9 @@ option = ["Regolazione massima velocità",
           "Reset mappatura tasti",
           "Salva preset impostazioni"]
 
+SERIAL_PORT = "COM9"      # Cambia in "/dev/ttyUSB0" su Linux
+BAUD_RATE = 115200        
+
 class Controller():
     def __init__(self):
         pygame.init()
@@ -23,9 +27,9 @@ class Controller():
             quit()
 
         self.js = pygame.joystick.Joystick(0)
-        
-        # Inizializza la seriale (cambia porta e baudrate secondo necessità)
-       
+        self.ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.1) #
+        print(f"Connesso a {SERIAL_PORT}")
+               
 
         PATHS, BUTTON, AXIS = loadWorkSpace()
         presetMenu(PATHS["presetIndex"], PATHS["presetPath"])
@@ -218,4 +222,25 @@ class Controller():
             self.data["acceleratore"],
             self.data["freno"]
         )
+
+        try:
+            # Esempio: Sterzo al centro, 50% acceleratore, Marcia 2, Avanti
+            # Valori input ipotetici (mappati 0-255)
+            pacchetto = genera_pacchetto(
+                steer=127, 
+                accel=128, 
+                brake=0, 
+                speed_sel=1, 
+                reverse=self.retromarcia
+            )
+            
+            # Invio fisico del pacchetto
+            self.ser.write(pacchetto) #
+            print(f"Inviato: {pacchetto.hex().upper()}")
+
+        except Exception as e:
+            print(f"Errore: {e}")
+        finally:
+            if 'ser' in locals() and self.ser.is_open:
+                self.ser.close()
 
