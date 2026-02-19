@@ -74,6 +74,7 @@ class Controller():
                 self.gestioneUscite(event)
                 self.gestioneBottoni(event)
                 self.gestioneAssi(event)
+            self.invioSeriale()
         
         pygame.quit()
 
@@ -223,6 +224,7 @@ class Controller():
             self.data["freno"]
         )
 
+    def invioSeriale(self):
         try:
             # Generazione pacchetto CORRETTA
             pacchetto = genera_pacchetto(
