@@ -283,6 +283,7 @@ def genera_pacchetto(steer, accel, brake, speed_sel, reverse, commands=0):
     """
     # Clipping dei valori (0-255 per gli assi, 0-15 per le marce)
     steer_byte = max(0, min(255, int(round((steer + 1.0) * 127.5))))
+    print(f"Steer raw: {steer}, Steer byte: {steer_byte}")
     accel = max(0, min(255, int(accel)))
     brake = max(0, min(255, int(brake)))
     speed_sel = max(0, min(15, int(speed_sel)))
