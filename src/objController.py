@@ -74,7 +74,6 @@ class Controller():
                 self.gestioneUscite(event)
                 self.gestioneBottoni(event)
                 self.gestioneAssi(event)
-            self.invioSeriale()
         
         pygame.quit()
 
@@ -124,6 +123,7 @@ class Controller():
         
         if self.start:
             self.invioDati()
+            self.invioSeriale()
 
     def gestioneInizio(self):
         if self.firstStart:
