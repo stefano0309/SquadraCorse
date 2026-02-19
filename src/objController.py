@@ -1,7 +1,7 @@
 import pygame
 import json
-from serial import *
 from colorama import *
+import serial
 from src.utils import *
 
 init(autoreset=True)
@@ -27,7 +27,7 @@ class Controller():
             quit()
 
         self.js = pygame.joystick.Joystick(0)
-        self.ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.1) #
+        self.ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.1) 
         print(f"Connesso a {SERIAL_PORT}")
                
 
