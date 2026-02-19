@@ -5,7 +5,7 @@ import json
 from art import *
 import struct
       
-BINARY_MARKER = 170
+BINARY_MARKER = 0xAA
 
 
 #---- Funzioni setUp ----
@@ -268,34 +268,30 @@ def showInfo(volante, acceleratore, freno):
     print("VOLANTE: "+str(volante), "ACCELERATORE: "+str(acceleratore), "FRENO: "+ str(freno))
             
 def crc16_ccitt(data: bytes) -> int:
-    """Calcola il checksum CRC-16 CCITT necessario per l'integrità del pacchetto."""
     crc = 0xFFFF
     for b in data:
         crc ^= b << 8
         for _ in range(8):
             crc = ((crc << 1) ^ 0x1021) if (crc & 0x8000) else (crc << 1)
             crc &= 0xFFFF
-    return crc #
+    return crc
 
 def genera_pacchetto(steer, accel, brake, speed_sel, reverse, commands=0):
-    """
-    Comprime i dati nel formato binario richiesto dal protocollo.
-    """
-    # Clipping dei valori (0-255 per gli assi, 0-15 per le marce)
-    # Esempio di curva esponenziale (ammorbidisce il centro)
-    steer_scaled = steer ** 3  # Oppure steer * abs(steer)
-    steer_byte = max(0, min(255, int(round(steer_scaled * 127.0 + 128.0))))
-    print(f"Steer raw: {steer}, Steer byte: {steer_byte}")
-    accel = max(0, min(255, int(accel)))
-    brake = max(0, min(255, int(brake)))
-    speed_sel = max(0, min(15, int(speed_sel)))
+    # 1. Conversione Sterzo: da [-1.0, 1.0] a [0, 255] con 128 centrale
+    # Usiamo 127.0 per garantire che 0.0 diventi esattamente 128
+    steer_byte = max(0, min(255, int(round(steer * 127.0 + 128.0))))
     
-    # Costruzione del byte 'misc': [Marcia(4bit) | Retro(1bit) | Comandi(3bit)]
+    # 2. Conversione Pedali: assumendo input joystick [0.0, 1.0]
+    accel_byte = max(0, min(255, int(accel * 255.0)))
+    brake_byte = max(0, min(255, int(brake * 255.0)))
+    
+    # 3. Costruzione byte misc [cite: 57, 82, 83]
+    speed_sel = max(0, min(15, int(speed_sel)))
     misc = ((speed_sel & 0x0F) << 4) | ((1 if reverse else 0) << 3) | (commands & 0x07)
     
-    # Composizione del payload e calcolo checksum
-    payload = bytes([steer_byte, accel, brake, misc]) 
+    # 4. Payload per il CRC (i 4 byte che il TX userà per validare il frame USB) 
+    payload = bytes([steer_byte, accel_byte, brake_byte, misc]) 
     crc = crc16_ccitt(payload)
     
-    # Frame finale: Marker + Payload + CRC (2 byte Big Endian)
+    # 5. Frame finale USB: Marker (1) + Dati (4) + CRC (2) = 7 byte 
     return bytes([BINARY_MARKER]) + payload + struct.pack(">H", crc)
