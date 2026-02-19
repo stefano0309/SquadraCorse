@@ -27,7 +27,7 @@ class Controller():
             quit()
 
         self.js = pygame.joystick.Joystick(0)
-        self.ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.1) 
+        self.ser = serial(SERIAL_PORT, BAUD_RATE, timeout=0.1) 
         print(f"Connesso a {SERIAL_PORT}")
                
 
