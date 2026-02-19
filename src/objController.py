@@ -13,7 +13,7 @@ option = ["Regolazione massima velocità",
           "Reset mappatura tasti",
           "Salva preset impostazioni"]
 
-SERIAL_PORT = "COM9"      # Cambia in "/dev/ttyUSB0" su Linux
+SERIAL_PORT = "/dev/ttyUSB0"      # Cambia in "/dev/ttyUSB0" su Linux
 BAUD_RATE = 115200        
 
 class Controller():
