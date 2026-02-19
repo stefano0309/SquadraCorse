@@ -1,7 +1,7 @@
 import pygame
 import json
 from colorama import *
-import pyserial
+import serial
 from  src.utils import *
 
 init(autoreset=True)
