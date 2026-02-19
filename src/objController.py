@@ -223,15 +223,6 @@ class Controller():
             self.data["freno"]
         )
 
-        # Recupero assi (Assicurati che i nomi corrispondano al tuo dizionario)
-
-        # Aggiornamento dati interni
-        self.data.update({
-            "volante": round(self.js.get_axis(self.axis["volante"]), 2),
-            "acceleratore": round(self.js.get_axis(self.axis["acceleratore"]), 2),
-            "freno": round(self.js.get_axis(self.axis["freno"]), 2),
-        })
-
         try:
             # Generazione pacchetto CORRETTA
             pacchetto = genera_pacchetto(
