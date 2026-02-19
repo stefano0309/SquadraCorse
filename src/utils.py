@@ -282,7 +282,7 @@ def genera_pacchetto(steer, accel, brake, speed_sel, reverse, commands=0):
     Comprime i dati nel formato binario richiesto dal protocollo.
     """
     # Clipping dei valori (0-255 per gli assi, 0-15 per le marce)
-    steer = max(0, min(255, int(steer)))
+    steer = max(0, min(255, int(steer * 127.5)))
     accel = max(0, min(255, int(accel)))
     brake = max(0, min(255, int(brake)))
     speed_sel = max(0, min(15, int(speed_sel)))
