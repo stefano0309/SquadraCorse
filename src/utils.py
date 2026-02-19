@@ -279,7 +279,7 @@ def crc16_ccitt(data: bytes) -> int:
 def genera_pacchetto(steer, accel, brake, speed_sel, reverse, commands=0):
     # 1. Conversione Sterzo: da [-1.0, 1.0] a [0, 255] con 128 centrale
     # Usiamo 127.0 per garantire che 0.0 diventi esattamente 128
-    steer_byte = max(0, min(255, int(round(steer * 127.0 + 128.0))))
+    steer_byte = max(0, min(255, int(round(steer * 127.0))))
     
     # 2. Conversione Pedali: assumendo input joystick [0.0, 1.0]
     accel_byte = max(0, min(255, int(accel * 255.0)))
