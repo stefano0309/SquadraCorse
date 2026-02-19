@@ -103,7 +103,7 @@ def main():
     last_display = 0.0
 
     # soglia pressione per eseguire azioni al rilascio
-    press_threshold = 0.08
+    press_threshold = 0.02
     hold_start_main: dict[int, float] = {}
 
     clear_once()
@@ -180,10 +180,10 @@ def main():
 
                 steer_byte = max(0, min(255, int((volante + 1.0) * 127.5)))
                 accel_byte = max(0, min(255, int((accel + 1.0) / 2 * 255)))
-                brake_byte = max(0, min(255, int((freno + 1.0) / 2 * 255)))
+                brake_pressed = (freno + 1.0) / 2 > 0.10
 
                 if rc.connected:
-                    rc.send_data(steer_byte, accel_byte, brake_byte, speed_sel, reverse, commands)
+                    rc.send_data(steer_byte, accel_byte, brake_pressed, speed_sel, reverse, commands)
 
             # Display
             if now - last_display >= DISPLAY_REFRESH_S:

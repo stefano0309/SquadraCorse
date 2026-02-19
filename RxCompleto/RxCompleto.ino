@@ -1,13 +1,12 @@
 /*
  * RxCompleto.ino — Ricezione Squadra Corse
  *
- * Pacchetto radio 10 byte:
+ * Pacchetto radio 9 byte:
  *   [0-3] Token "VAL1"
  *   [4]   Sterzo        (0-255, 128 = centro)
  *   [5]   Accelerazione (0-255)
- *   [6]   Freno         (0-255)
- *   [7]   speed_sel:4 | reverse:1 | comandi:3
- *   [8-9] CRC-16 CCITT  (big-endian, su byte 0-7)
+ *   [6]   speed_sel:4 | brake:1 | reverse:1 | comandi:2
+ *   [7-8] CRC-16 CCITT  (big-endian, su byte 0-6)
  *
  * Hot-swap hardware: il modulo viene sostituito fisicamente.
  * Il RX ri-proba periodicamente (ogni PROBE_INTERVAL_MS) e
@@ -29,11 +28,18 @@
 #include <nRF24L01.h>
 #include <RF24.h>
 RF24 radio(2, 4);                       // CE=2, CSN=4
-const byte nrfAddress[6] = "00001";
+const byte nrfAddress[6] = "00001"; 
 
 // ==================== Servo ====================
 #define SERVO_PIN       26
 const int SERVO_CENTER = 90;
+
+// ==================== Motore ====================
+#define PWM_PIN         25
+#define DIR_FWD_PIN     33
+#define DIR_REV_PIN     32
+#define PWM_FREQ      1000
+#define PWM_RES          8      // 8 bit → 0-255
 
 // ============== CONFIGURAZIONE ==============
 #define STEER_ANGLE_MAX     45
@@ -42,7 +48,7 @@ const int SERVO_CENTER = 90;
 #define DEADZONE             0.08f
 #define FAILSAFE_MS          500
 #define PROBE_INTERVAL_MS   2000        // ms tra un probe e l'altro
-#define PACKET_SIZE          10
+#define PACKET_SIZE           9
 
 Servo servo;
 
@@ -50,9 +56,19 @@ Servo servo;
 enum RadioType { RADIO_NONE, RADIO_LORA, RADIO_NRF24 };
 RadioType activeRadio = RADIO_NONE;
 
-unsigned long lastPacketTime = 0;
-unsigned long lastProbeMs    = 0;
+unsigned long lastPacketTime      = 0;
+unsigned long lastProbeMs         = 0;
+unsigned long lastVelocityUpdate  = 0;
 float lastSteerNorm = 0.0f;
+
+// ── Stato motore ──
+bool    rx_freno             = false;
+bool    rx_retro             = false;
+uint8_t rx_pressione_pedale  = 0;
+uint8_t rx_marcia            = 1;
+float   velocita_target      = 0;
+float   velocita_attuale     = 0;
+bool    freno_premuto        = false;
 
 // ==================== CRC-16 ====================
 uint16_t crc16_ccitt(const uint8_t *data, uint8_t len) {
@@ -135,8 +151,8 @@ void processPacket(const uint8_t *buf, int rssi) {
     return;
   }
 
-  uint16_t rxCrc   = ((uint16_t)buf[8] << 8) | buf[9];
-  uint16_t calcCrc = crc16_ccitt(buf, 8);
+  uint16_t rxCrc   = ((uint16_t)buf[7] << 8) | buf[8];
+  uint16_t calcCrc = crc16_ccitt(buf, 7);
   if (rxCrc != calcCrc) {
     Serial.println("CRC_ERR");
     return;
@@ -146,12 +162,12 @@ void processPacket(const uint8_t *buf, int rssi) {
 
   uint8_t steerByte = buf[4];
   uint8_t accelByte = buf[5];
-  uint8_t brakeByte = buf[6];
-  uint8_t miscByte  = buf[7];
+  uint8_t miscByte  = buf[6];
 
   uint8_t speedSel  = (miscByte >> 4) & 0x0F;
-  bool    reverse   = (miscByte >> 3) & 0x01;
-  uint8_t commands  = miscByte & 0x07;
+  bool    brake     = (miscByte >> 3) & 0x01;
+  bool    reverse   = (miscByte >> 2) & 0x01;
+  uint8_t commands  = miscByte & 0x03;
 
   // ── Sterzo → servo ──
   float steerNorm = ((float)steerByte - 128.0f) / 127.0f;
@@ -167,17 +183,17 @@ void processPacket(const uint8_t *buf, int rssi) {
     servo.write(angle);
   }
 
-  // ── Accelerazione con riduttore retro ──
-  float effectiveAccel = (float)accelByte / 255.0f;
-  if (reverse) effectiveAccel *= REVERSE_MULTIPLIER;
-
-  uint8_t mappedSpeed = map(speedSel, 0, 15, 1, MAX_SPEEDS);
+  // ── Aggiorna stato motore ──
+  rx_freno            = brake;
+  rx_retro            = reverse;
+  rx_pressione_pedale = accelByte;
+  rx_marcia           = map(speedSel, 0, 15, 1, MAX_SPEEDS);
 
   // ── Output seriale ──
   Serial.print("S:");   Serial.print(steerNorm, 2);
-  Serial.print(" A:");  Serial.print(effectiveAccel, 2);
-  Serial.print(" B:");  Serial.print((float)brakeByte / 255.0f, 2);
-  Serial.print(" G:");  Serial.print(mappedSpeed);
+  Serial.print(" A:");  Serial.print((float)accelByte / 255.0f, 2);
+  Serial.print(" B:");  Serial.print(brake ? "Y" : "N");
+  Serial.print(" G:");  Serial.print(rx_marcia);
   Serial.print(" R:");  Serial.print(reverse ? "Y" : "N");
   Serial.print(" C:");  Serial.print(commands);
   if (activeRadio == RADIO_LORA) {
@@ -194,6 +210,13 @@ void setup() {
 
   servo.attach(SERVO_PIN, 500, 2400);
   servo.write(SERVO_CENTER);
+
+  // Motore
+  ledcAttach(PWM_PIN, PWM_FREQ, PWM_RES);
+  pinMode(DIR_FWD_PIN, OUTPUT);
+  pinMode(DIR_REV_PIN, OUTPUT);
+  digitalWrite(DIR_FWD_PIN, LOW);
+  digitalWrite(DIR_REV_PIN, LOW);
 
   activeRadio = detectRadio();
 
@@ -218,21 +241,76 @@ void loop() {
   // ── Failsafe ──
   if (lastPacketTime > 0 && (millis() - lastPacketTime > FAILSAFE_MS)) {
     servo.write(SERVO_CENTER);
+    ledcWrite(PWM_PIN, 0);
+    digitalWrite(DIR_FWD_PIN, LOW);
+    digitalWrite(DIR_REV_PIN, LOW);
+    velocita_attuale = 0;
+    velocita_target  = 0;
     lastPacketTime = 0;
     Serial.println("FAILSAFE");
   }
 
+  // ── Ricezione pacchetto ──
   uint8_t buf[PACKET_SIZE] = {0};
 
   if (activeRadio == RADIO_LORA) {
     int pktSize = LoRa.parsePacket(PACKET_SIZE);
-    if (pktSize != PACKET_SIZE) return;
-    for (int i = 0; i < PACKET_SIZE; i++) buf[i] = LoRa.read();
-    processPacket(buf, LoRa.packetRssi());
+    if (pktSize == PACKET_SIZE) {
+      for (int i = 0; i < PACKET_SIZE; i++) buf[i] = LoRa.read();
+      processPacket(buf, LoRa.packetRssi());
+    }
   }
   else if (activeRadio == RADIO_NRF24) {
-    if (!radio.available()) return;
-    radio.read(buf, PACKET_SIZE);
-    processPacket(buf, 0);
+    if (radio.available()) {
+      radio.read(buf, PACKET_SIZE);
+      processPacket(buf, 0);
+    }
+  }
+
+  // ── Aggiornamento velocità e motore (ogni 10 ms) ──
+  if (millis() - lastVelocityUpdate >= 40) {
+    lastVelocityUpdate = millis();
+
+    // 1. Calcolo velocità target
+    if (rx_freno) {
+      velocita_target = 0;
+      freno_premuto = true;
+    }
+    else if (rx_retro) {
+      velocita_target = -((float)(rx_pressione_pedale * rx_marcia) / MAX_SPEEDS) / 2.0f;
+      freno_premuto = false;
+    }
+    else {
+      velocita_target = (float)(rx_pressione_pedale * rx_marcia) / MAX_SPEEDS;
+      freno_premuto = false;
+    }
+
+    // 2. Aggiornamento velocità attuale
+    if (freno_premuto) {
+      if (velocita_attuale > 0)      velocita_attuale -= 2;
+      else if (velocita_attuale < 0) velocita_attuale += 2;
+      if (fabs(velocita_attuale) < 2) velocita_attuale = 0;
+    }
+    else {
+      if (velocita_attuale < velocita_target)      velocita_attuale++;
+      else if (velocita_attuale > velocita_target) velocita_attuale--;
+    }
+
+    // 3. Output motore
+    int pwmVal = constrain(abs((int)velocita_attuale), 0, 255);
+    ledcWrite(PWM_PIN, pwmVal);
+
+    if (velocita_attuale > 0) {
+      digitalWrite(DIR_FWD_PIN, HIGH);
+      digitalWrite(DIR_REV_PIN, LOW);
+    }
+    else if (velocita_attuale < 0) {
+      digitalWrite(DIR_FWD_PIN, LOW);
+      digitalWrite(DIR_REV_PIN, HIGH);
+    }
+    else {
+      digitalWrite(DIR_FWD_PIN, LOW);
+      digitalWrite(DIR_REV_PIN, LOW);
+    }
   }
 }

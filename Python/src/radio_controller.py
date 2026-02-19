@@ -88,15 +88,14 @@ class RadioController:
             try: self.tx_power = int(parts[3])
             except: pass
 
-    def send_data(self, steer: int, accel: int, brake: int, speed_sel: int, reverse: bool, commands: int) -> bool:
+    def send_data(self, steer: int, accel: int, brake: bool, speed_sel: int, reverse: bool, commands: int) -> bool:
         if not self.ser: return False
         steer = max(0, min(255, steer))
         accel = max(0, min(255, accel))
-        brake = max(0, min(255, brake))
         speed_sel = max(0, min(15, speed_sel))
-        commands = max(0, min(7, commands))
-        misc = ((speed_sel & 0x0F) << 4) | ((1 if reverse else 0) << 3) | (commands & 0x07)
-        payload = bytes([steer, accel, brake, misc])
+        commands = max(0, min(3, commands))
+        misc = ((speed_sel & 0x0F) << 4) | ((1 if brake else 0) << 3) | ((1 if reverse else 0) << 2) | (commands & 0x03)
+        payload = bytes([steer, accel, misc])
         crc = crc16_ccitt(payload)
         frame = bytes([BINARY_MARKER]) + payload + struct.pack(">H", crc)
         try:

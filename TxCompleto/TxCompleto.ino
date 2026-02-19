@@ -1,13 +1,12 @@
 /*
  * TxCompleto.ino — Trasmissione Squadra Corse
  *
- * Pacchetto radio 10 byte:
+ * Pacchetto radio 9 byte:
  *   [0-3] Token "VAL1"
  *   [4]   Sterzo       (0-255, 128 = centro)
  *   [5]   Accelerazione(0-255)
- *   [6]   Freno        (0-255)
- *   [7]   speed_sel:4 | reverse:1 | comandi:3
- *   [8-9] CRC-16 CCITT  (big-endian, su byte 0-7)
+ *   [6]   speed_sel:4 | brake:1 | reverse:1 | comandi:2
+ *   [7-8] CRC-16 CCITT  (big-endian, su byte 0-6)
  *
  * Protocollo USB  (testo, '\n'-terminated):
  *   HANDSHAKE          → ACK <modulo> <rate> [<txpower>]
@@ -21,8 +20,8 @@
  * Hot-swap hardware: il modulo viene sostituito fisicamente.
  * Il TX ri-proba periodicamente e segnala il cambio via USB.
  *
- * Protocollo USB  (binario, 7 byte):
- *   0xAA | sterzo | accel | freno | misc | CRC-16 hi | CRC-16 lo
+ * Protocollo USB  (binario, 6 byte):
+ *   0xAA | sterzo | accel | misc | CRC-16 hi | CRC-16 lo
  */
 
 #include <SPI.h>
@@ -42,8 +41,8 @@ RF24 radio(2, 4);                       // CE=2, CSN=4
 const byte nrfAddress[6] = "00001";
 
 // ================ CONFIGURAZIONE ================
-#define PACKET_SIZE        10
-#define USB_FRAME_SIZE      7
+#define PACKET_SIZE         9
+#define USB_FRAME_SIZE      6
 #define BINARY_MARKER    0xAA
 #define PROBE_INTERVAL_MS 2000          // ogni 2 s controlla se il modulo è cambiato
 
@@ -145,13 +144,13 @@ void probeRadio() {
 }
 
 // ========== COSTRUZIONE + TRASMISSIONE ==========
-bool transmitPacket(const uint8_t *payload4) {
+bool transmitPacket(const uint8_t *payload3) {
   uint8_t pkt[PACKET_SIZE];
   pkt[0] = 'V'; pkt[1] = 'A'; pkt[2] = 'L'; pkt[3] = '1';
-  memcpy(pkt + 4, payload4, 4);
-  uint16_t crc = crc16_ccitt(pkt, 8);
-  pkt[8] = (crc >> 8) & 0xFF;
-  pkt[9] =  crc       & 0xFF;
+  memcpy(pkt + 4, payload3, 3);
+  uint16_t crc = crc16_ccitt(pkt, 7);
+  pkt[7] = (crc >> 8) & 0xFF;
+  pkt[8] =  crc       & 0xFF;
 
   if (activeRadio == RADIO_LORA) {
     LoRa.beginPacket(true);
@@ -250,8 +249,8 @@ void loop() {
     uint8_t frame[USB_FRAME_SIZE];
     Serial.readBytes(frame, USB_FRAME_SIZE);
 
-    uint16_t rxCrc   = ((uint16_t)frame[5] << 8) | frame[6];
-    uint16_t calcCrc = crc16_ccitt(frame + 1, 4);
+    uint16_t rxCrc   = ((uint16_t)frame[4] << 8) | frame[5];
+    uint16_t calcCrc = crc16_ccitt(frame + 1, 3);
 
     if (rxCrc != calcCrc) {
       Serial.println("CRC_ERR");
