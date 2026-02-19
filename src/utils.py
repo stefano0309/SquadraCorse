@@ -291,7 +291,7 @@ def genera_pacchetto(steer, accel, brake, speed_sel, reverse, commands=0):
     misc = ((speed_sel & 0x0F) << 4) | ((1 if reverse else 0) << 3) | (commands & 0x07)
     
     # Composizione del payload e calcolo checksum
-    payload = bytes([steer, accel, brake, misc])
+    payload = bytes([steer, accel, brake, misc]) 
     crc = crc16_ccitt(payload)
     
     # Frame finale: Marker + Payload + CRC (2 byte Big Endian)

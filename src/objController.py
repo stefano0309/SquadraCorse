@@ -1,6 +1,6 @@
 import pygame
 import json
-import serial
+from serial import *
 from colorama import *
 from src.utils import *
 

@@ -2,4 +2,3 @@ colorama
 pygame-ce
 serial
 art
-struct
