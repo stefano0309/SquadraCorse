@@ -227,7 +227,7 @@ class Controller():
             # Esempio: Sterzo al centro, 50% acceleratore, Marcia 2, Avanti
             # Valori input ipotetici (mappati 0-255)
             pacchetto = genera_pacchetto(
-                steer=127, 
+                steer=self.data["volante"], 
                 accel=128, 
                 brake=0, 
                 speed_sel=1, 
