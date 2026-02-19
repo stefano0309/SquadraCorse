@@ -228,7 +228,7 @@ class Controller():
             # Valori input ipotetici (mappati 0-255)
             pacchetto = genera_pacchetto(
                 steer=self.data["volante"], 
-                accel=128, 
+                accel=0, 
                 brake=0, 
                 speed_sel=1, 
                 reverse=self.retromarcia

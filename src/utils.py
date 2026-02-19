@@ -282,7 +282,9 @@ def genera_pacchetto(steer, accel, brake, speed_sel, reverse, commands=0):
     Comprime i dati nel formato binario richiesto dal protocollo.
     """
     # Clipping dei valori (0-255 per gli assi, 0-15 per le marce)
-    steer_byte = max(0, min(255, int(round((steer + 1.0) * 127.5))))
+    # Esempio di curva esponenziale (ammorbidisce il centro)
+    steer_scaled = steer ** 3  # Oppure steer * abs(steer)
+    steer_byte = max(0, min(255, int(round(steer_scaled * 127.0 + 128.0))))
     print(f"Steer raw: {steer}, Steer byte: {steer_byte}")
     accel = max(0, min(255, int(accel)))
     brake = max(0, min(255, int(brake)))
