@@ -1,4 +1,4 @@
 colorama
 pygame-ce
-serial
+pyserial
 art
