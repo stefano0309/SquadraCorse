@@ -27,7 +27,7 @@ class Controller():
             quit()
 
         self.js = pygame.joystick.Joystick(0)
-        self.ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.1) 
+        ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.1) 
         print(f"Connesso a {SERIAL_PORT}")
                
 
@@ -235,12 +235,12 @@ class Controller():
             )
             
             # Invio fisico del pacchetto
-            self.ser.write(pacchetto) #
+            ser.write(pacchetto) #
             print(f"Inviato: {pacchetto.hex().upper()}")
 
         except Exception as e:
             print(f"Errore: {e}")
         finally:
-            if 'ser' in locals() and self.ser.is_open:
-                self.ser.close()
+            if 'ser' in locals() and ser.is_open:
+                ser.close()
 
