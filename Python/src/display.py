@@ -27,7 +27,7 @@ def display(rc: RadioController, volante: float, accel: float, brake: float,
         pad(f"  Sterzo     : {volante:+6.2f}"),
         pad(f"  Acceleraz. : {accel:6.2f}"),
         pad(f"  Freno      : {brake:6.2f}"),
-        pad(f"  Marcia     : {1 + speed_sel}/{max_speeds}  [{'RETRO' if reverse else 'AVANTI'}]"), mid,
+        pad(f"  Vel. Max   : {(1 + speed_sel) * 10}%  [{'RETRO' if reverse else 'AVANTI'}]"), mid,
     ]
     for i in range(4):
         lines.append(pad(f"  >> {tail[i]}") if i < len(tail) else pad(""))

@@ -34,7 +34,7 @@ def scopri_assi(js) -> dict:
 
 def scopri_pulsanti(js) -> dict:
     print("\n  --- MAPPATURA PULSANTI (premi il pulsante, timeout 10 s) ---\n")
-    nomi = ["MARCIA_SU", "MARCIA_GIU", "RETRO", "MENU"]
+    nomi = ["VEL_SU", "VEL_GIU", "RETRO", "MENU"]
     buttons: dict[str, int] = {}
     for nome in nomi:
         print(f"  {nome}: ", end="", flush=True)

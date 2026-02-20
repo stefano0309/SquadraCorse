@@ -130,12 +130,12 @@ def main():
                         if ev.button == idx:
                             start = hold_start_main.pop(idx, None)
                             if start is not None and time.time() - start >= press_threshold:
-                                if nome == "MARCIA_SU":
+                                if nome == "VEL_SU":
                                     speed_sel = min(max_speeds - 1, speed_sel + 1)
-                                    log_lines.append(f"Marcia → {speed_sel + 1}")
-                                elif nome == "MARCIA_GIU":
+                                    log_lines.append(f"Vel. max → {(speed_sel + 1) * 10}%")
+                                elif nome == "VEL_GIU":
                                     speed_sel = max(0, speed_sel - 1)
-                                    log_lines.append(f"Marcia → {speed_sel + 1}")
+                                    log_lines.append(f"Vel. max → {(speed_sel + 1) * 10}%")
                                 elif nome == "RETRO":
                                     reverse = not reverse
                                     log_lines.append("RETRO ON" if reverse else "RETRO OFF")

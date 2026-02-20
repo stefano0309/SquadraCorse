@@ -7,7 +7,7 @@ from radio_controller import RadioController
 MENU_ITEMS = [
     {"label": "TX Power (dBm)",     "key": "tx_power",  "type": "slider", "min": -5,  "max": 20,  "step": 1},
     {"label": "Send Rate (Hz)",     "key": "send_rate", "type": "slider", "min": 1,   "max": 100, "step": 1},
-    {"label": "Max Marce",          "key": "max_speeds","type": "slider", "min": 0,   "max": 16,  "step": 1},
+    {"label": "Livelli Velocit\u00e0",  "key": "max_speeds","type": "slider", "min": 0,   "max": 16,  "step": 1},
     {"label": "Porta Seriale",      "key": "serial_port", "type": "info"},
     {"label": "Rimappa Controller", "key": "remap",       "type": "action"},
     {"label": "Refresh Status TX",  "key": "refresh",     "type": "action"},
@@ -69,8 +69,8 @@ def run_menu(js, pulsanti: dict, rc: RadioController, cfg: dict) -> dict:
     press_threshold = 0.08
 
     retro_idx = pulsanti.get("RETRO")
-    nav_up_idx = pulsanti.get("MARCIA_SU")
-    nav_down_idx = pulsanti.get("MARCIA_GIU")
+    nav_up_idx = pulsanti.get("VEL_SU")
+    nav_down_idx = pulsanti.get("VEL_GIU")
 
     retro_hold_start = nav_hold_start = enter_hold_start = None
     retro_next_repeat = nav_next_repeat = enter_last_repeat = 0.0
@@ -162,7 +162,7 @@ def run_menu(js, pulsanti: dict, rc: RadioController, cfg: dict) -> dict:
                         if ev.button == idx:
                             start = hold_start.pop(idx, None)
                             if start is not None and now - start >= press_threshold:
-                                if nome in ("MARCIA_SU", "MARCIA_GIU"):
+                                if nome in ("VEL_SU", "VEL_GIU"):
                                     action = nome
                                     last_nav_press = now
                                 elif nome == "RETRO":
@@ -183,7 +183,7 @@ def run_menu(js, pulsanti: dict, rc: RadioController, cfg: dict) -> dict:
                     if idx in hold_start:
                         start = hold_start.pop(idx)
                         if now - start >= press_threshold:
-                            if nome in ("MARCIA_SU", "MARCIA_GIU"):
+                            if nome in ("VEL_SU", "VEL_GIU"):
                                 action = nome
                                 last_nav_press = now
                             elif nome == "RETRO":
@@ -208,8 +208,8 @@ def run_menu(js, pulsanti: dict, rc: RadioController, cfg: dict) -> dict:
 
             # tastiera
             key = read_key()
-            if key == "UP":    action = "MARCIA_SU"
-            elif key == "DOWN": action = "MARCIA_GIU"
+            if key == "UP":    action = "VEL_SU"
+            elif key == "DOWN": action = "VEL_GIU"
             elif key == "LEFT" and editing:
                 if adjust_current(-1): display_menu(cursor, rc, cfg, editing)
             elif key == "RIGHT" and editing:
@@ -221,12 +221,12 @@ def run_menu(js, pulsanti: dict, rc: RadioController, cfg: dict) -> dict:
 
             if action == "MENU":
                 break
-            elif action == "MARCIA_SU":
+            elif action == "VEL_SU":
                 if editing and MENU_ITEMS[cursor].get("type") == "slider":
                     if adjust_current(-1): display_menu(cursor, rc, cfg, editing)
                 else:
                     cursor = (cursor - 1) % len(MENU_ITEMS)
-            elif action == "MARCIA_GIU":
+            elif action == "VEL_GIU":
                 if editing and MENU_ITEMS[cursor].get("type") == "slider":
                     if adjust_current(+1): display_menu(cursor, rc, cfg, editing)
                 else:

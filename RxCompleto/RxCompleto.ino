@@ -6,7 +6,15 @@
  *   [4]   Sterzo        (0-255, 128 = centro)
  *   [5]   Accelerazione (0-255)
  *   [6]   speed_sel:4 | brake:1 | reverse:1 | comandi:2
+ *         speed_sel 0-9 → velocità max 10%-100% (step 10%)
  *   [7-8] CRC-16 CCITT  (big-endian, su byte 0-6)
+ *
+ * Controllo motore con rampa differenziata:
+ *   - Accelerazione progressiva verso il target
+ *   - Frenata rapida quando il freno è premuto
+ *   - Decelerazione dolce in rilascio acceleratore (coast)
+ *
+ * PID sul servo sterzo per movimenti fluidi e stabili.
  *
  * Hot-swap hardware: il modulo viene sostituito fisicamente.
  * Il RX ri-proba periodicamente (ogni PROBE_INTERVAL_MS) e
@@ -43,12 +51,29 @@ const int SERVO_CENTER = 90;
 
 // ============== CONFIGURAZIONE ==============
 #define STEER_ANGLE_MAX     45
-#define MAX_SPEEDS           6
 #define REVERSE_MULTIPLIER   0.5f
 #define DEADZONE             0.08f
 #define FAILSAFE_MS          500
 #define PROBE_INTERVAL_MS   2000        // ms tra un probe e l'altro
 #define PACKET_SIZE           9
+#define UPDATE_INTERVAL_MS    20        // aggiornamento motore/servo (50 Hz)
+
+// ── Velocità percentuale (10 livelli: 10%..100%) ──
+#define SPEED_LEVELS         10
+
+// ── Rampe motore (unità PWM per tick di UPDATE_INTERVAL_MS) ──
+#define ACCEL_RATE          6.0f   // accelerazione verso target
+#define DECEL_COAST         3.0f   // rilascio acceleratore (coast)
+#define DECEL_BRAKE        15.0f   // frenata attiva
+
+// ── Soglia minima PWM per vincere l'attrito statico ──
+#define MOTOR_MIN_PWM       25
+
+// ── PID Servo ──
+#define SERVO_KP           0.35f
+#define SERVO_KI           0.008f
+#define SERVO_KD           0.20f
+#define SERVO_I_MAX       30.0f   // anti-windup
 
 Servo servo;
 
@@ -59,16 +84,20 @@ RadioType activeRadio = RADIO_NONE;
 unsigned long lastPacketTime      = 0;
 unsigned long lastProbeMs         = 0;
 unsigned long lastVelocityUpdate  = 0;
-float lastSteerNorm = 0.0f;
 
 // ── Stato motore ──
 bool    rx_freno             = false;
 bool    rx_retro             = false;
 uint8_t rx_pressione_pedale  = 0;
-uint8_t rx_marcia            = 1;
+uint8_t rx_speed_pct         = 10;     // percentuale velocità max (10-100)
 float   velocita_target      = 0;
 float   velocita_attuale     = 0;
-bool    freno_premuto        = false;
+
+// ── PID Servo stato ──
+float servo_target_angle     = SERVO_CENTER;
+float servo_current_angle    = SERVO_CENTER;
+float servo_integral         = 0.0f;
+float servo_prev_error       = 0.0f;
 
 // ==================== CRC-16 ====================
 uint16_t crc16_ccitt(const uint8_t *data, uint8_t len) {
@@ -169,31 +198,24 @@ void processPacket(const uint8_t *buf, int rssi) {
   bool    reverse   = (miscByte >> 2) & 0x01;
   uint8_t commands  = miscByte & 0x03;
 
-  // ── Sterzo → servo ──
+  // ── Sterzo → target PID servo ──
   float steerNorm = ((float)steerByte - 128.0f) / 127.0f;
   steerNorm = constrain(steerNorm, -1.0f, 1.0f);
   if (fabs(steerNorm) < DEADZONE) steerNorm = 0.0f;
-
-  if (fabs(steerNorm - lastSteerNorm) >= 0.02f) {
-    lastSteerNorm = steerNorm;
-    int angle = SERVO_CENTER + (int)(steerNorm * STEER_ANGLE_MAX);
-    angle = constrain(angle,
-                      SERVO_CENTER - STEER_ANGLE_MAX,
-                      SERVO_CENTER + STEER_ANGLE_MAX);
-    servo.write(angle);
-  }
+  servo_target_angle = SERVO_CENTER + steerNorm * STEER_ANGLE_MAX;
 
   // ── Aggiorna stato motore ──
   rx_freno            = brake;
   rx_retro            = reverse;
   rx_pressione_pedale = accelByte;
-  rx_marcia           = map(speedSel, 0, 15, 1, MAX_SPEEDS);
+  // speed_sel 0-9 → 10%..100%  (valori >9 clampati a 100%)
+  rx_speed_pct        = min((int)(speedSel + 1) * 10, 100);
 
   // ── Output seriale ──
   Serial.print("S:");   Serial.print(steerNorm, 2);
   Serial.print(" A:");  Serial.print((float)accelByte / 255.0f, 2);
   Serial.print(" B:");  Serial.print(brake ? "Y" : "N");
-  Serial.print(" G:");  Serial.print(rx_marcia);
+  Serial.print(" V:");  Serial.print(rx_speed_pct); Serial.print("%");
   Serial.print(" R:");  Serial.print(reverse ? "Y" : "N");
   Serial.print(" C:");  Serial.print(commands);
   if (activeRadio == RADIO_LORA) {
@@ -241,6 +263,10 @@ void loop() {
   // ── Failsafe ──
   if (lastPacketTime > 0 && (millis() - lastPacketTime > FAILSAFE_MS)) {
     servo.write(SERVO_CENTER);
+    servo_current_angle = SERVO_CENTER;
+    servo_target_angle  = SERVO_CENTER;
+    servo_integral      = 0;
+    servo_prev_error    = 0;
     ledcWrite(PWM_PIN, 0);
     digitalWrite(DIR_FWD_PIN, LOW);
     digitalWrite(DIR_REV_PIN, LOW);
@@ -267,44 +293,68 @@ void loop() {
     }
   }
 
-  // ── Aggiornamento velocità e motore (ogni 10 ms) ──
-  if (millis() - lastVelocityUpdate >= 40) {
+  // ── Aggiornamento motore + servo PID (ogni UPDATE_INTERVAL_MS) ──
+  if (millis() - lastVelocityUpdate >= UPDATE_INTERVAL_MS) {
     lastVelocityUpdate = millis();
 
-    // 1. Calcolo velocità target
+    // ═══ PID SERVO ═══
+    float servoErr  = servo_target_angle - servo_current_angle;
+    servo_integral += servoErr;
+    servo_integral  = constrain(servo_integral, -SERVO_I_MAX, SERVO_I_MAX);
+    float servoDer  = servoErr - servo_prev_error;
+    servo_prev_error = servoErr;
+
+    float pidOut = SERVO_KP * servoErr
+                 + SERVO_KI * servo_integral
+                 + SERVO_KD * servoDer;
+    servo_current_angle += pidOut;
+    servo_current_angle  = constrain(servo_current_angle,
+                                     (float)(SERVO_CENTER - STEER_ANGLE_MAX),
+                                     (float)(SERVO_CENTER + STEER_ANGLE_MAX));
+    servo.write((int)(servo_current_angle + 0.5f));
+
+    // ═══ CALCOLO VELOCITA TARGET ═══
+    float max_pwm = 255.0f * rx_speed_pct / 100.0f;
+
+    if (rx_retro) {
+      velocita_target = -(rx_pressione_pedale / 255.0f) * max_pwm * REVERSE_MULTIPLIER;
+    } else {
+      velocita_target = (rx_pressione_pedale / 255.0f) * max_pwm;
+    }
+
+    // ═══ RAMPA VELOCITA (freno ≫ coast) ═══
     if (rx_freno) {
-      velocita_target = 0;
-      freno_premuto = true;
-    }
-    else if (rx_retro) {
-      velocita_target = -((float)(rx_pressione_pedale * rx_marcia) / MAX_SPEEDS) / 2.0f;
-      freno_premuto = false;
-    }
-    else {
-      velocita_target = (float)(rx_pressione_pedale * rx_marcia) / MAX_SPEEDS;
-      freno_premuto = false;
-    }
-
-    // 2. Aggiornamento velocità attuale
-    if (freno_premuto) {
-      if (velocita_attuale > 0)      velocita_attuale -= 2;
-      else if (velocita_attuale < 0) velocita_attuale += 2;
-      if (fabs(velocita_attuale) < 2) velocita_attuale = 0;
-    }
-    else {
-      if (velocita_attuale < velocita_target)      velocita_attuale++;
-      else if (velocita_attuale > velocita_target) velocita_attuale--;
+      // Frenata attiva: decelerazione molto rapida verso 0
+      if (fabs(velocita_attuale) <= DECEL_BRAKE) {
+        velocita_attuale = 0;
+      } else {
+        velocita_attuale -= copysignf(DECEL_BRAKE, velocita_attuale);
+      }
+    } else {
+      float diff = velocita_target - velocita_attuale;
+      if (fabs(diff) < 1.0f) {
+        velocita_attuale = velocita_target;
+      } else {
+        // Accelerazione rapida, coast lenta
+        bool accelerating = (fabs(velocita_target) >= fabs(velocita_attuale));
+        float rate = accelerating ? ACCEL_RATE : DECEL_COAST;
+        float step = min(fabs(diff), rate);
+        velocita_attuale += copysignf(step, diff);
+      }
     }
 
-    // 3. Output motore
-    int pwmVal = constrain(abs((int)velocita_attuale), 0, 255);
+    // ═══ OUTPUT MOTORE ═══
+    int pwmVal = (int)(fabs(velocita_attuale) + 0.5f);
+    // Soglia minima PWM per vincere l'inerzia statica
+    if (pwmVal > 0 && pwmVal < MOTOR_MIN_PWM) pwmVal = MOTOR_MIN_PWM;
+    pwmVal = constrain(pwmVal, 0, 255);
     ledcWrite(PWM_PIN, pwmVal);
 
-    if (velocita_attuale > 0) {
+    if (velocita_attuale > 0.5f) {
       digitalWrite(DIR_FWD_PIN, HIGH);
       digitalWrite(DIR_REV_PIN, LOW);
     }
-    else if (velocita_attuale < 0) {
+    else if (velocita_attuale < -0.5f) {
       digitalWrite(DIR_FWD_PIN, LOW);
       digitalWrite(DIR_REV_PIN, HIGH);
     }
