@@ -2,18 +2,19 @@ import pygame
 import json
 import serial
 import struct
+import time
 from colorama import *
 from src.utils import *
 
 init(autoreset=True)
 
-# Definizioni tasti e opzioni
-button = ["START", "EXIT", "SETTINGS", "UP", "DOWN", "SELECT", "RETRO_ON", "RETRO_OFF"]
-axis = ["STEERING", "ACCELERATOR", "BRAKE"]
-option = ["Regolazione massima velocità", 
-          "Regolazione angolo massimo sterzo", 
-          "Reset mappatura tasti",
-          "Salva preset impostazioni"]
+# Definizioni costanti per mappatura e menu
+button_list = ["START", "EXIT", "SETTINGS", "UP", "DOWN", "SELECT", "RETRO_ON", "RETRO_OFF"]
+axis_list = ["STEERING", "ACCELERATOR", "BRAKE"]
+options_list = ["Regolazione massima velocità", 
+                "Regolazione angolo massimo sterzo", 
+                "Reset mappatura tasti",
+                "Salva preset impostazioni"]
 
 class Controller():
     def __init__(self):
@@ -21,72 +22,119 @@ class Controller():
         pygame.joystick.init()
 
         if pygame.joystick.get_count() == 0:
-            print("Nessun controller trovato.")
+            print(Fore.RED + "ERRORE: Nessun controller trovato." + Style.RESET_ALL)
             pygame.quit()
             quit()
 
         self.js = pygame.joystick.Joystick(0)
         self.js.init()
 
-        # Configurazione Seriale
+        # --- Inizializzazione Seriale ---
         try:
-            # Assicurati che la porta COM corrisponda a quella del tuo trasmettitore
+            # Modifica "COM9" con la tua porta reale se necessario
             self.ser = serial.Serial("COM9", 115200, timeout=0.1) 
-            print(Fore.GREEN + "Connessione seriale stabilita." + Style.RESET_ALL)
+            print(Fore.GREEN + "Connessione seriale stabilita con successo." + Style.RESET_ALL)
         except Exception as e:
             self.ser = None
-            print(Fore.RED + f"Errore seriale: {e}. Modalità simulazione attiva." + Style.RESET_ALL)
+            print(Fore.YELLOW + "AVVISO: Seriale non trovata. Modalità simulazione attiva." + Style.RESET_ALL)
 
-        # Caricamento ambiente e preset
-        PATHS, BUTTON, AXIS = loadWorkSpace()
+        # --- Caricamento Workspace e Preset ---
+        PATHS, BUTTON_PRESET, AXIS_PRESET = loadWorkSpace()
+        # Carica velocity (0-100%) e angle (gradi) dal file presetIndex/presetPath
         self.velocity, self.angle = presetMenu(PATHS["presetIndex"], PATHS["presetPath"])
         
         self.paths = PATHS
-        self.presetButton = BUTTON
-        self.presetAxis = AXIS
+        self.presetButton = BUTTON_PRESET
+        self.presetAxis = AXIS_PRESET
 
-        # Mappatura hardware
-        buttonMap(self.presetButton, self.presetAxis, button, axis, self.paths["configPath"])
-        setUpVolante(self.js, button, axis, self.paths["configPath"])
+        # --- Configurazione Mappatura Hardware ---
+        buttonMap(self.presetButton, self.presetAxis, button_list, axis_list, self.paths["configPath"])
+        setUpVolante(self.js, button_list, axis_list, self.paths["configPath"])
         
         buttonMp, axisMp = loadMap(self.paths["configPath"])
         CLEAR()
-
         INIZIALISE(self.js)
         
-        # Stato veicolo e dati
-        self.data = {}
         self.buttons = buttonMp
         self.axis = axisMp
 
-        # Stato applicazione
+        # --- Stato Interno ---
         self.running = True
         self.firstStart = True
         self.start = False
         self.settings = False
         self.selectItem = False
         self.retromarcia = False
-        
-        # Gestione UI
         self.selected = 0
         self.position = 0
-        self.option_selected = option
+        self.option_selected = options_list
+        
+        # SOGLIA DRIFT (Deadzone)
+        self.deadzone = 0.08  # Ignora input inferiori all'8%
+
+    def apply_deadzone(self, value):
+        """Applica zona morta e riscala l'input per fluidità."""
+        if abs(value) < self.deadzone:
+            return 0.0
+        # Riscalatura: trasforma [deadzone, 1.0] in [0.0, 1.0]
+        return (value - (self.deadzone if value > 0 else -self.deadzone)) / (1.0 - self.deadzone)
 
     def run(self):
+        """Loop principale dell'applicazione."""
         while self.running:
             for event in pygame.event.get():
                 self.gestioneUscite(event)
                 self.gestioneBottoni(event)
                 self.gestioneAssi(event)
             
-            # Invio continuo dei dati se il veicolo è avviato
+            # Invio dati binari se il sistema è attivo
             if self.start and not self.settings:
                 self.invioDati()
-                time.sleep(0.02) # Frequenza circa 50Hz
+                # 50Hz di frequenza per non intasare il buffer seriale
+                time.sleep(0.02) 
                     
-        if self.ser: self.ser.close()
+        if self.ser: 
+            self.ser.close()
         pygame.quit()
 
+    def invioDati(self):
+        """Legge gli assi, applica tolleranze/preset e invia il pacchetto binario."""
+        # 1. Lettura Assi
+        steer_raw = self.js.get_axis(self.axis["STEERING"])
+        accel_raw = self.js.get_axis(self.axis["ACCELERATOR"])
+        brake_raw = self.js.get_axis(self.axis["BRAKE"])
+
+        # 2. Pulizia Drift (Deadzone)
+        steer_clean = self.apply_deadzone(steer_raw)
+        
+        # Normalizzazione pedali (solitamente da -1 a 1 nei volanti/pad)
+        accel_norm = (accel_raw + 1) / 2
+        brake_norm = (brake_raw + 1) / 2
+
+        # Protezione minima pedali
+        if accel_norm < 0.02: accel_norm = 0.0
+        if brake_norm < 0.02: brake_norm = 0.0
+
+        # 3. Applicazione Limite Velocità dal Preset (%)
+        # Se self.velocity è 50, l'accelerazione massima inviata sarà 0.5
+        accel_limitato = accel_norm * (self.velocity / 100.0)
+
+        # 4. Creazione pacchetto binario (genera_pacchetto definito in utils.py)
+        # NOTA: speed_sel è 0 perché il sistema marce è rimosso.
+        pachetto = genera_pacchetto(
+            steer_clean, 
+            accel_limitato, 
+            brake_norm, 
+            0, 
+            self.retromarcia, 
+            0
+        )
+
+        # 5. Invio sulla seriale
+        if self.ser and self.ser.is_open:
+            self.ser.write(pachetto)
+
+    # --- Gestione Eventi ---
     def gestioneUscite(self, event):
         if event.type == pygame.QUIT:
             self.running = False
@@ -99,11 +147,11 @@ class Controller():
         
         if event.button == self.buttons["RETRO_ON"]:
             self.retromarcia = True
-            print(Fore.GREEN + "Retromarcia inserita." + Style.RESET_ALL)
+            print(Fore.CYAN + "RETROMARCIA: ON" + Style.RESET_ALL)
             
         elif event.button == self.buttons["RETRO_OFF"]:
             self.retromarcia = False
-            print(Fore.GREEN + "Retromarcia disinserita." + Style.RESET_ALL)
+            print(Fore.CYAN + "RETROMARCIA: OFF" + Style.RESET_ALL)
 
         elif event.button == self.buttons["START"]:
             self.gestioneInizio()
@@ -120,7 +168,7 @@ class Controller():
         if event.type != pygame.JOYAXISMOTION:
             return
 
-        # Navigazione impostazioni tramite asse (es. sterzo)
+        # Navigazione menu impostazioni tramite assi
         if self.settings and self.selectItem:
             if self.selected == 0: # Velocità
                 self.position, self.velocity = settingOption(event.value, self.position, 100, 0, self.velocity, self.selected, 0, 5, self.option_selected)
@@ -173,7 +221,7 @@ class Controller():
         self.selectItem = True
         CLEAR()
         if self.selected == 2: # Reset Mappatura
-            setUpVolante(self.js, button, axis, self.paths["configPath"])
+            setUpVolante(self.js, button_list, axis_list, self.paths["configPath"])
             self.buttons, self.axis = loadMap(self.paths["configPath"])
             self.settings = False
             drawMenu()
@@ -182,35 +230,6 @@ class Controller():
             self.selectItem = False
             drawSettings(self.selected, self.option_selected)
         else:
-            # Visualizza barre di regolazione per Vel/Angolo
             drawSettings(self.selected, self.option_selected)
             if self.selected == 0: drawSettingOption(0, 100, self.velocity, 5)
             if self.selected == 1: drawSettingOption(0, 180, self.angle, 9)
-
-    def invioDati(self):
-        # 1. Lettura assi
-        steer_raw = self.js.get_axis(self.axis["STEERING"])
-        accel_raw = (self.js.get_axis(self.axis["ACCELERATOR"]) + 1) / 2 # Normalizzato 0-1
-        brake_raw = (self.js.get_axis(self.axis["BRAKE"]) + 1) / 2       # Normalizzato 0-1
-
-        # 2. Applicazione limiti dai preset (Percentuale velocità)
-        # La velocità massima effettiva è limitata da self.velocity (0-100%)
-        accel_limitato = accel_raw * (self.velocity / 100.0)
-        
-        # L'angolo sterzo è già gestito dal valore float -1 a 1, 
-        # il ricevitore userà self.angle per mappare i gradi.
-        
-        # 3. Generazione pacchetto binario
-        # Utilizziamo la marcia fissa a 0 poiché il sistema marce è rimosso
-        pachetto = genera_pacchetto(
-            steer_raw, 
-            accel_limitato, 
-            brake_raw, 
-            0, # speed_sel rimosso
-            self.retromarcia, 
-            0
-        )
-
-        # 4. Invio seriale
-        if self.ser and self.ser.is_open:
-            self.ser.write(pachetto)
