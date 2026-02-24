@@ -1,7 +1,6 @@
 import pygame
 import json
 from colorama import *
-import serial
 from  src.utils import *
 
 init(autoreset=True)
@@ -12,9 +11,7 @@ option = ["Regolazione massima velocità",
           "Regolazione angolo massimo sterzo", 
           "Reset mappatura tasti",
           "Salva preset impostazioni"]
-
-SERIAL_PORT = "/dev/ttyUSB0"      # Cambia in "/dev/ttyUSB0" su Linux
-BAUD_RATE = 115200        
+     
 
 class Controller():
     def __init__(self):
@@ -26,10 +23,7 @@ class Controller():
             pygame.quit()
             quit()
 
-        self.js = pygame.joystick.Joystick(0)
-        self.ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.1) 
-        print(f"Connesso a {SERIAL_PORT}")
-               
+        self.js = pygame.joystick.Joystick(0)               
 
         PATHS, BUTTON, AXIS = loadWorkSpace()
         presetMenu(PATHS["presetIndex"], PATHS["presetPath"])
@@ -38,7 +32,10 @@ class Controller():
         self.presetAxis = AXIS
 
         buttonMap(self.presetButton, self.presetAxis, button, axis, self.paths["configPath"])
+        setUpVolante(self.js, button, axis, self.paths["configPath"])
+        
         buttonMp, axisMp = loadMap(self.paths["configPath"])
+        CLEAR()
 
         INIZIALISE(self.js)
         
@@ -73,8 +70,8 @@ class Controller():
             for event in pygame.event.get():
                 self.gestioneUscite(event)
                 self.gestioneBottoni(event)
-                self.gestioneAssi(event)
-        
+                self.gestioneAssi(event)     
+                    
         pygame.quit()
 
     def gestioneUscite(self, event):
@@ -120,10 +117,9 @@ class Controller():
                 self.position, self.velocity = settingOption(event.value, self.position, 100, 0, self.velocity, self.selected, 0, 5, self.option_selected)
             if self.selected == 1:
                 self.position, self.angle = settingOption(event.value, self.position, 180, 0, self.angle, self.selected, 1, 9, self.option_selected)
+        if self.start and not self.settings:
+            self.invioDati()   
         
-        if self.start:
-            self.invioDati()
-            self.invioSeriale()
 
     def gestioneInizio(self):
         if self.firstStart:
@@ -194,8 +190,7 @@ class Controller():
                     drawSettingOption(0, 180, self.angle, 9)
                 if self.selected == 2:
                     CLEAR()
-                    os.remove(self.paths["configPath"])
-                    buttonMap(self.presetButton, self.presetAxis, button, axis, self.paths["configPath"])
+                    setUpVolante(self.js, button, axis, self.paths["configPath"])
                     self.buttons, self.axis = loadMap(self.paths["configPath"])
                     CLEAR()
                     self.settings = False
@@ -210,35 +205,9 @@ class Controller():
             print(Fore.RED + "Premi X per tornare al menu principale.")
 
     def invioDati(self):
-        # Aggiornamento del dizionario con i dati del joystick
         self.data.update({
-            "volante": round(self.js.get_axis(self.axis["STEERING"]), 2),
-            "acceleratore": round(self.js.get_axis(self.axis["ACCELERATOR"]), 2),
-            "freno": round(self.js.get_axis(self.axis["BRAKE"]), 2),
+            "velocity":  self.js.get_axis(self.axis["ACCELERATOR"]),
+            "angle": self.js.get_axis(self.axis["STEERING"])
         })
-
-        # Visualizzazione a schermo (tua funzione esistente)
-        showInfo(
-            self.data["volante"],
-            self.data["acceleratore"],
-            self.data["freno"]
-        )
-
-    def invioSeriale(self):
-        try:
-            # Generazione pacchetto CORRETTA
-            pacchetto = genera_pacchetto(
-                steer=self.data["volante"], 
-                accel=self.data["acceleratore"], 
-                brake=self.data["freno"], 
-                speed_sel=1, # Esempio marcia 1
-                reverse=self.retromarcia
-            )
-            
-            # Invio (Non chiudere la seriale ogni volta, rallenta il sistema!)
-            if self.ser.is_open:
-                self.ser.write(pacchetto)
-                # print(f"Inviato HEX: {pacchetto.hex().upper()}")
-
-        except Exception as e:
-            print(f"Errore invio: {e}")
+        pachet = json.dumps(self.data)
+        print(f"Dati inviati: {pachet}")

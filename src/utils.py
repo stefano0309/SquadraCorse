@@ -2,7 +2,9 @@ import os
 from colorama import * 
 from datetime import *
 import json
+import pygame
 from art import *
+import time
 import struct
       
 BINARY_MARKER = 0xAA
@@ -46,6 +48,48 @@ def setUpWorkSpace():
             }
             json.dump(data, f, indent=4)
 
+
+def setUpVolante(js, button_names, axis_names, path):
+    CLEAR()
+    print(Fore.YELLOW + "Rilevamento hardware: " + js.get_name() + Style.RESET_ALL)
+    
+    if input("Modificare i valori di default? (y/n): ").lower() != "y":
+        print(Fore.GREEN + "Valori di default mantenuti." + Style.RESET_ALL)
+        return
+
+    data = {"button": {}, "axis": {}}
+
+    print(Fore.CYAN + "\n--- CONFIGURAZIONE PULSANTI ---")
+    for btn in button_names:
+        print(f"Premi il tasto per: {Fore.YELLOW}{btn}{Style.RESET_ALL}...")
+        found = False
+        while not found:
+            pygame.event.pump()
+            for event in pygame.event.get():
+                if event.type == pygame.JOYBUTTONDOWN:
+                    data["button"][btn] = event.button
+                    print(f"ID {event.button} assegnato a {btn}")
+                    found = True
+                    time.sleep(0.3) 
+
+    print(Fore.CYAN + "\n--- CONFIGURAZIONE ASSI ---")
+    for axs in axis_names:
+        print(f"Muovi l'asse per: {Fore.YELLOW}{axs}{Style.RESET_ALL}...")
+        found = False
+        while not found:
+            pygame.event.pump()
+            for i in range(js.get_numaxes()):
+                val = js.get_axis(i)
+                if abs(val) > 0.8:
+                    data["axis"][axs] = i
+                    print(f"Asse {i} assegnato a {axs}")
+                    found = True
+                    time.sleep(0.5)
+                    break
+
+    writefile(path, data)
+    print(Fore.GREEN + "\nMappatura salvata con successo!" + Style.RESET_ALL)
+
 #--- Funzioni di preset ---
 
 def readfile(path):
@@ -66,7 +110,6 @@ def loadWorkSpace():
     return PATHS, BUTTON, AXIS
 
 
-# Funzione helper per validare gli input numerici
 def get_int_input(prompt, min_val, max_val):
     while True:
         try:
