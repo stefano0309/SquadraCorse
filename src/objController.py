@@ -98,32 +98,44 @@ class Controller():
         pygame.quit()
 
     def invioDati(self):
-        
-        raw_steer = self.js.get_axis(self.axis["STEERING"])
-        raw_accel = self.js.get_axis(self.axis["ACCELERATOR"])
-        raw_brake = self.js.get_axis(self.axis["BRAKE"])
-        
-        # 2. Mappatura a 0-255
-        # Lo sterzo ha centro a 0, va mappato con centro a 128
+        # 1. Lettura dei valori dagli assi con applicazione della Deadzone
+        # Pygame restituisce valori da -1.0 a 1.0
+        raw_steer = self.apply_deadzone(self.js.get_axis(self.axis["STEERING"]))
+        raw_accel = self.apply_deadzone(self.js.get_axis(self.axis["ACCELERATOR"]))
+        raw_brake = self.apply_deadzone(self.js.get_axis(self.axis["BRAKE"]))
+
+        # 2. Mappatura dello sterzo (0-255, centro 128)
         steer_byte = int((raw_steer + 1.0) / 2.0 * 255)
-        
-        # Anche i grilletti (spesso) vanno da -1.0 (rilasciato) a 1.0 (premuto a fondo)
-        accel_byte = int((raw_accel + 1.0) / 2.0 * 255)
+
+        # 3. Mappatura Acceleratore con limite di potenza (self.velocity)
+        # Convertiamo l'input in 0-255 e poi lo scaliamo per la percentuale impostata
+        accel_raw = int((raw_accel + 1.0) / 2.0 * 255)
+        power_limit = self.velocity / 100.0
+        accel_byte = int(accel_raw * power_limit)
+
+        # 4. Mappatura Freno
         brake_byte = int((raw_brake + 1.0) / 2.0 * 255)
-        
-        # 3. Sicurezza: Forziamo i valori tra 0 e 255 (Clamp)
+
+        # 5. Vincoli di sicurezza (Clamp)
         steer_byte = max(0, min(255, steer_byte))
         accel_byte = max(0, min(255, accel_byte))
         brake_byte = max(0, min(255, brake_byte))
+
+        # 6. Logica Freno e Retromarcia
+        # Consideriamo il freno "attivo" se premuto oltre una certa soglia
+        is_braking = brake_byte > 20 
         
-        # 4. Freno logico: applichiamo una deadzone (es. scatta solo se premuto oltre il 10%)
-        is_braking = brake_byte > 25 
-        
-        # 5. Trasmissione
-        self.rc.send_data(steer_byte, accel_byte, is_braking, self.velocity, self.retromarcia, 0)
-        
-        # Attesa per non saturare il modulo radio
-        time.sleep(0.01)
+        # 7. Invio dei dati tramite il modulo radio
+        # Passiamo 0 come 'speed_sel' perché la logica marce è stata eliminata
+        # e gestita direttamente dallo scaling dell'accel_byte qui sopra.
+        self.rc.send_data(
+            steer=steer_byte, 
+            accel=accel_byte, 
+            brake=is_braking, 
+            speed_sel=0, 
+            reverse=self.retromarcia, 
+            commands=0
+        )
 
     # --- Gestione Eventi ---
     def gestioneUscite(self, event):

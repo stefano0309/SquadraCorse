@@ -43,7 +43,6 @@ const int SERVO_CENTER = 90;
 
 // ============== CONFIGURAZIONE ==============
 #define STEER_ANGLE_MAX     45
-#define MAX_SPEEDS           6
 #define REVERSE_MULTIPLIER   0.5f
 #define DEADZONE             0.08f
 #define FAILSAFE_MS          500
@@ -65,7 +64,6 @@ float lastSteerNorm = 0.0f;
 bool    rx_freno             = false;
 bool    rx_retro             = false;
 uint8_t rx_pressione_pedale  = 0;
-uint8_t rx_marcia            = 1;
 float   velocita_target      = 0;
 float   velocita_attuale     = 0;
 bool    freno_premuto        = false;
@@ -164,7 +162,7 @@ void processPacket(const uint8_t *buf, int rssi) {
   uint8_t accelByte = buf[5];
   uint8_t miscByte  = buf[6];
 
-  uint8_t speedSel  = (miscByte >> 4) & 0x0F;
+  //uint8_t speedSel  = (miscByte >> 4) & 0x0F;
   bool    brake     = (miscByte >> 3) & 0x01;
   bool    reverse   = (miscByte >> 2) & 0x01;
   uint8_t commands  = miscByte & 0x03;
@@ -187,7 +185,7 @@ void processPacket(const uint8_t *buf, int rssi) {
   rx_freno            = brake;
   rx_retro            = reverse;
   rx_pressione_pedale = accelByte;
-  rx_marcia           = map(speedSel, 0, 15, 1, MAX_SPEEDS);
+  //rx_marcia           = map(speedSel, 0, 15, 1, MAX_SPEEDS);
 
   // ── Output seriale ──
   Serial.print("S:");   Serial.print(steerNorm, 2);
@@ -277,11 +275,13 @@ void loop() {
       freno_premuto = true;
     }
     else if (rx_retro) {
-      velocita_target = -((float)(rx_pressione_pedale * rx_marcia) / MAX_SPEEDS) / 2.0f;
+      // In retro usiamo la pressione del pedale (0-255), divisa per 2 per sicurezza [cite: 115]
+      velocita_target = -((float)rx_pressione_pedale) / 2.0f;
       freno_premuto = false;
     }
     else {
-      velocita_target = (float)(rx_pressione_pedale * rx_marcia) / MAX_SPEEDS;
+      // Marcia avanti: mappatura diretta 1:1 dal pedale [cite: 116]
+      velocita_target = (float)rx_pressione_pedale;
       freno_premuto = false;
     }
 
