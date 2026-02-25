@@ -47,6 +47,58 @@ def setUpWorkSpace():
                 "presetAxis": ["0","5","1"]
             }
             json.dump(data, f, indent=4)
+        
+        data = {
+            "SERIAL_BAUD": 115200,
+            "MAX_SPEEDS": 6,
+            "DISPLAY_REFRESH_S": 0.1,
+            "MAPPING_FILE": "mapping.json",
+            "DEFAULT_SEND_RATE": 30,
+            "BINARY_MARKER": 0xAA,
+            "DEFAULT_TX_POWER": 10
+        }
+        writefile(path+"\\data\\radioConfig.json", data)
+
+
+def scopri_assi(js, axis_names):
+    print(f"\n  Mapping Assi per: {js.get_name()}")
+    nomi = axis_names
+    assi = {}
+    for nome in nomi:
+        print(f"  Muovi {nome}...", end="", flush=True)
+        baseline = [js.get_axis(i) for i in range(js.get_numaxes())]
+        found = False
+        t0 = time.time()
+        while time.time() - t0 < 10 and not found:
+            pygame.event.pump()
+            for i in range(js.get_numaxes()):
+                if abs(js.get_axis(i) - baseline[i]) > 0.5:
+                    assi[nome] = i
+                    print(f" OK (Asse {i})")
+                    found = True
+                    time.sleep(0.5)
+                    break
+        if not found: print(" Timeout!")
+    return assi
+
+def scopri_pulsanti(js, button_names):
+    print("\n  Mapping Pulsanti...")
+    nomi = button_names
+    btns = {}
+    for nome in nomi:
+        print(f"  Premi {nome}...", end="", flush=True)
+        found = False
+        t0 = time.time()
+        while time.time() - t0 < 10 and not found:
+            pygame.event.pump()
+            for i in range(js.get_numbuttons()):
+                if js.get_button(i):
+                    btns[nome] = i
+                    print(f" OK (Btn {i})")
+                    found = True
+                    time.sleep(0.5)
+                    break
+    return btns
 
 
 def setUpVolante(js, button_names, axis_names, path):
@@ -59,33 +111,15 @@ def setUpVolante(js, button_names, axis_names, path):
 
     data = {"button": {}, "axis": {}}
 
+    
     print(Fore.CYAN + "\n--- CONFIGURAZIONE PULSANTI ---")
-    for btn in button_names:
-        print(f"Premi il tasto per: {Fore.YELLOW}{btn}{Style.RESET_ALL}...")
-        found = False
-        while not found:
-            pygame.event.pump()
-            for event in pygame.event.get():
-                if event.type == pygame.JOYBUTTONDOWN:
-                    data["button"][btn] = event.button
-                    print(f"ID {event.button} assegnato a {btn}")
-                    found = True
-                    time.sleep(0.3) 
+    btns = scopri_pulsanti(js, button_names)
 
     print(Fore.CYAN + "\n--- CONFIGURAZIONE ASSI ---")
-    for axs in axis_names:
-        print(f"Muovi l'asse per: {Fore.YELLOW}{axs}{Style.RESET_ALL}...")
-        found = False
-        while not found:
-            pygame.event.pump()
-            for i in range(js.get_numaxes()):
-                val = js.get_axis(i)
-                if abs(val) > 0.8:
-                    data["axis"][axs] = i
-                    print(f"Asse {i} assegnato a {axs}")
-                    found = True
-                    time.sleep(0.5)
-                    break
+    assi = scopri_assi(js, axis_names)
+
+    data["button"] = btns
+    data["axis"] = assi
 
     writefile(path, data)
     print(Fore.GREEN + "\nMappatura salvata con successo!" + Style.RESET_ALL)
@@ -319,22 +353,3 @@ def crc16_ccitt(data: bytes) -> int:
             crc &= 0xFFFF
     return crc
 
-def genera_pacchetto(steer, accel, brake, speed_sel, reverse, commands=0):
-    # 1. Conversione Sterzo: da [-1.0, 1.0] a [0, 255] con 128 centrale
-    # Usiamo 127.0 per garantire che 0.0 diventi esattamente 128
-    steer_byte = max(0, min(255, int(round(steer * 127.0 + 128))))
-    
-    # 2. Conversione Pedali: assumendo input joystick [0.0, 1.0]
-    accel_byte = max(0, min(255, int(accel * 255.0)))
-    brake_byte = max(0, min(255, int(brake * 255.0)))
-    
-    # 3. Costruzione byte misc [cite: 57, 82, 83]
-    speed_sel = max(0, min(15, int(speed_sel)))
-    misc = ((speed_sel & 0x0F) << 4) | ((1 if reverse else 0) << 3) | (commands & 0x07)
-    
-    # 4. Payload per il CRC (i 4 byte che il TX userà per validare il frame USB) 
-    payload = bytes([steer_byte, accel_byte, brake_byte, misc]) 
-    crc = crc16_ccitt(payload)
-    
-    # 5. Frame finale USB: Marker (1) + Dati (4) + CRC (2) = 7 byte 
-    return bytes([BINARY_MARKER]) + payload + struct.pack(">H", crc)
