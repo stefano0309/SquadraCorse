@@ -93,8 +93,8 @@ class Controller():
                 self.invioDati()
                 time.sleep(0.02) 
                     
-        if self.ser: 
-            self.ser.close()
+        if self.rc: 
+            self.rc.close()
         pygame.quit()
 
     def invioDati(self):

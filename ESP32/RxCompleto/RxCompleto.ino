@@ -191,7 +191,6 @@ void processPacket(const uint8_t *buf, int rssi) {
   Serial.print("S:");   Serial.print(steerNorm, 2);
   Serial.print(" A:");  Serial.print((float)accelByte / 255.0f, 2);
   Serial.print(" B:");  Serial.print(brake ? "Y" : "N");
-  Serial.print(" G:");  Serial.print(rx_marcia);
   Serial.print(" R:");  Serial.print(reverse ? "Y" : "N");
   Serial.print(" C:");  Serial.print(commands);
   if (activeRadio == RADIO_LORA) {

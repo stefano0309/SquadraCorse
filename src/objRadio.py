@@ -3,7 +3,7 @@ from src.utils import *
 
 class RadioController:
     def __init__(self):
-        self.config = readfile(os.getcwd()+"\\src\\data\\radioConfig.json")
+        self.config = readfile(os.getcwd()+"/src/data/radioConfig.json")
         self.ser: serial.Serial | None = None
         self.module = "UNKNOWN"
         self.send_rate = self.config['DEFAULT_SEND_RATE']
