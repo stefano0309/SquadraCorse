@@ -1,23 +1,22 @@
 /*
- * RxCompleto.ino — Ricezione Squadra Corse
+ * RxCompleto.ino — Ricezione Squadra Corse (robust link)
  *
- * Pacchetto radio 9 byte:
- *   [0-3] Token "VAL1"
+ * Pacchetto radio 10 byte:
+ *   [0-3] Token "VAL2"
  *   [4]   Sterzo        (0-255, 128 = centro)
  *   [5]   Accelerazione (0-255)
  *   [6]   speed_sel:4 | brake:1 | reverse:1 | comandi:2
- *   [7-8] CRC-16 CCITT  (big-endian, su byte 0-6)
- *
- * Hot-swap hardware: il modulo viene sostituito fisicamente.
- * Il RX ri-proba periodicamente (ogni PROBE_INTERVAL_MS) e
- * si adatta automaticamente al modulo presente.
+ *   [7]   Sequence ID
+ *   [8-9] CRC-16 CCITT (big-endian, su byte 0-7)
  */
 
 #include <SPI.h>
 #include <ESP32Servo.h>
+#include <LoRa.h>
+#include <nRF24L01.h>
+#include <RF24.h>
 
 // ==================== LoRa ====================
-#include <LoRa.h>
 #define LORA_SCK    18
 #define LORA_MISO   19
 #define LORA_MOSI   23
@@ -25,10 +24,8 @@
 #define LORA_RST    21
 
 // ==================== nRF24 ====================
-#include <nRF24L01.h>
-#include <RF24.h>
 RF24 radio(2, 4);                       // CE=2, CSN=4
-const byte nrfAddress[6] = "00001"; 
+const byte nrfAddress[6] = "00001";
 
 // ==================== Servo ====================
 #define SERVO_PIN       26
@@ -39,15 +36,17 @@ const int SERVO_CENTER = 90;
 #define DIR_FWD_PIN     33
 #define DIR_REV_PIN     32
 #define PWM_FREQ      1000
-#define PWM_RES          8      // 8 bit → 0-255
+#define PWM_RES          8
 
 // ============== CONFIGURAZIONE ==============
-#define STEER_ANGLE_MAX     45
-#define REVERSE_MULTIPLIER   0.5f
-#define DEADZONE             0.08f
-#define FAILSAFE_MS          500
-#define PROBE_INTERVAL_MS   2000        // ms tra un probe e l'altro
-#define PACKET_SIZE           9
+#define STEER_ANGLE_MAX        45
+#define DEADZONE            0.06f
+#define PACKET_SIZE            10
+#define PROBE_INTERVAL_MS    2000
+#define LINK_TIMEOUT_MS       350
+#define FAILSAFE_MS          1200
+#define MOTOR_TICK_MS          20
+#define STATS_INTERVAL_MS    1000
 
 Servo servo;
 
@@ -55,18 +54,27 @@ Servo servo;
 enum RadioType { RADIO_NONE, RADIO_LORA, RADIO_NRF24 };
 RadioType activeRadio = RADIO_NONE;
 
-unsigned long lastPacketTime      = 0;
-unsigned long lastProbeMs         = 0;
-unsigned long lastVelocityUpdate  = 0;
+unsigned long lastPacketTime = 0;
+unsigned long lastProbeMs = 0;
+unsigned long lastVelocityUpdate = 0;
+unsigned long lastStatsMs = 0;
+
 float lastSteerNorm = 0.0f;
 
-// ── Stato motore ──
-bool    rx_freno             = false;
-bool    rx_retro             = false;
-uint8_t rx_pressione_pedale  = 0;
-float   velocita_target      = 0;
-float   velocita_attuale     = 0;
-bool    freno_premuto        = false;
+bool    rx_freno = false;
+bool    rx_retro = false;
+uint8_t rx_pressione_pedale = 0;
+float   velocita_target = 0;
+float   velocita_attuale = 0;
+
+bool hasSeq = false;
+uint8_t lastSeq = 0;
+
+uint32_t statPktOk = 0;
+uint32_t statCrcErr = 0;
+uint32_t statTokenErr = 0;
+uint32_t statDup = 0;
+uint32_t statLost = 0;
 
 // ==================== CRC-16 ====================
 uint16_t crc16_ccitt(const uint8_t *data, uint8_t len) {
@@ -85,10 +93,14 @@ bool initLoRa() {
   SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
   LoRa.setPins(LORA_CS, LORA_RST, -1);
   if (!LoRa.begin(433E6)) return false;
-  LoRa.setSpreadingFactor(7);
-  LoRa.setSignalBandwidth(250E3);
-  LoRa.setCodingRate4(5);
-  LoRa.setPreambleLength(6);
+
+  // Stessa configurazione robusta del TX
+  LoRa.setSpreadingFactor(9);
+  LoRa.setSignalBandwidth(125E3);
+  LoRa.setCodingRate4(8);
+  LoRa.setPreambleLength(10);
+  LoRa.setSyncWord(0x12);
+  LoRa.enableCrc();
   return true;
 }
 
@@ -101,6 +113,7 @@ bool initNRF24() {
   radio.setPALevel(RF24_PA_MAX);
   radio.setDataRate(RF24_250KBPS);
   radio.setPayloadSize(PACKET_SIZE);
+  radio.setAutoAck(true);
   radio.openReadingPipe(1, nrfAddress);
   radio.startListening();
   return true;
@@ -120,12 +133,11 @@ const char *radioName() {
   }
 }
 
-// ========== PROBE PERIODICO ==========
 void probeRadio() {
   RadioType prev = activeRadio;
 
   bool stillAlive = false;
-  if (prev == RADIO_LORA)  stillAlive = initLoRa();
+  if (prev == RADIO_LORA) stillAlive = initLoRa();
   else if (prev == RADIO_NRF24) stillAlive = initNRF24();
 
   if (stillAlive) {
@@ -142,61 +154,77 @@ void probeRadio() {
   }
 }
 
-// ========== ELABORAZIONE PACCHETTO ==========
+void applySteeringFromByte(uint8_t steerByte) {
+  float steerNorm = ((float)steerByte - 128.0f) / 127.0f;
+  steerNorm = constrain(steerNorm, -1.0f, 1.0f);
+  if (fabs(steerNorm) < DEADZONE) steerNorm = 0.0f;
+
+  if (fabs(steerNorm - lastSteerNorm) >= 0.015f) {
+    lastSteerNorm = steerNorm;
+    int angle = SERVO_CENTER + (int)(steerNorm * STEER_ANGLE_MAX);
+    angle = constrain(angle, SERVO_CENTER - STEER_ANGLE_MAX, SERVO_CENTER + STEER_ANGLE_MAX);
+    servo.write(angle);
+  }
+}
+
 void processPacket(const uint8_t *buf, int rssi) {
-  if (buf[0] != 'V' || buf[1] != 'A' || buf[2] != 'L' || buf[3] != '1') {
-    Serial.println("TOKEN_ERR");
+  if (buf[0] != 'V' || buf[1] != 'A' || buf[2] != 'L' || buf[3] != '2') {
+    statTokenErr++;
     return;
   }
 
-  uint16_t rxCrc   = ((uint16_t)buf[7] << 8) | buf[8];
-  uint16_t calcCrc = crc16_ccitt(buf, 7);
+  uint16_t rxCrc   = ((uint16_t)buf[8] << 8) | buf[9];
+  uint16_t calcCrc = crc16_ccitt(buf, 8);
   if (rxCrc != calcCrc) {
-    Serial.println("CRC_ERR");
+    statCrcErr++;
     return;
   }
+
+  uint8_t seq = buf[7];
+  if (hasSeq) {
+    uint8_t delta = (uint8_t)(seq - lastSeq);
+    if (delta == 0) {
+      statDup++;
+      lastPacketTime = millis();
+      return;
+    }
+    if (delta > 1) {
+      statLost += (uint32_t)(delta - 1);
+    }
+  }
+  hasSeq = true;
+  lastSeq = seq;
 
   lastPacketTime = millis();
+  statPktOk++;
 
   uint8_t steerByte = buf[4];
   uint8_t accelByte = buf[5];
   uint8_t miscByte  = buf[6];
 
-  //uint8_t speedSel  = (miscByte >> 4) & 0x0F;
-  bool    brake     = (miscByte >> 3) & 0x01;
-  bool    reverse   = (miscByte >> 2) & 0x01;
-  uint8_t commands  = miscByte & 0x03;
+  bool brake = (miscByte >> 3) & 0x01;
+  bool reverse = (miscByte >> 2) & 0x01;
 
-  // ── Sterzo → servo ──
-  float steerNorm = ((float)steerByte - 128.0f) / 127.0f;
-  steerNorm = constrain(steerNorm, -1.0f, 1.0f);
-  if (fabs(steerNorm) < DEADZONE) steerNorm = 0.0f;
+  applySteeringFromByte(steerByte);
 
-  if (fabs(steerNorm - lastSteerNorm) >= 0.02f) {
-    lastSteerNorm = steerNorm;
-    int angle = SERVO_CENTER + (int)(steerNorm * STEER_ANGLE_MAX);
-    angle = constrain(angle,
-                      SERVO_CENTER - STEER_ANGLE_MAX,
-                      SERVO_CENTER + STEER_ANGLE_MAX);
-    servo.write(angle);
-  }
-
-  // ── Aggiorna stato motore ──
-  rx_freno            = brake;
-  rx_retro            = reverse;
+  rx_freno = brake;
+  rx_retro = reverse;
   rx_pressione_pedale = accelByte;
-  //rx_marcia           = map(speedSel, 0, 15, 1, MAX_SPEEDS);
 
-  // ── Output seriale ──
-  Serial.print("S:");   Serial.print(steerNorm, 2);
-  Serial.print(" A:");  Serial.print((float)accelByte / 255.0f, 2);
-  Serial.print(" B:");  Serial.print(brake ? "Y" : "N");
-  Serial.print(" R:");  Serial.print(reverse ? "Y" : "N");
-  Serial.print(" C:");  Serial.print(commands);
   if (activeRadio == RADIO_LORA) {
-    Serial.print(" RSSI:"); Serial.print(rssi);
+    Serial.print("RSSI:");
+    Serial.print(rssi);
+    Serial.print(" ");
   }
-  Serial.println();
+}
+
+void hardStop() {
+  velocita_attuale = 0;
+  velocita_target = 0;
+  ledcWrite(PWM_PIN, 0);
+  digitalWrite(DIR_FWD_PIN, LOW);
+  digitalWrite(DIR_REV_PIN, LOW);
+  servo.write(SERVO_CENTER);
 }
 
 // ======================== SETUP ========================
@@ -208,7 +236,6 @@ void setup() {
   servo.attach(SERVO_PIN, 500, 2400);
   servo.write(SERVO_CENTER);
 
-  // Motore
   ledcAttach(PWM_PIN, PWM_FREQ, PWM_RES);
   pinMode(DIR_FWD_PIN, OUTPUT);
   pinMode(DIR_REV_PIN, OUTPUT);
@@ -219,7 +246,6 @@ void setup() {
 
   if (activeRadio == RADIO_NONE) {
     Serial.println("ERR NO_RADIO");
-    // Non blocchiamo: il probe periodico ritenterà
   } else {
     Serial.print("RX READY ");
     Serial.println(radioName());
@@ -228,74 +254,74 @@ void setup() {
 
 // ======================== LOOP =========================
 void loop() {
-  // ── Probe periodico ──
   unsigned long now = millis();
+
   if (now - lastProbeMs >= PROBE_INTERVAL_MS) {
     lastProbeMs = now;
     probeRadio();
   }
 
-  // ── Failsafe ──
-  if (lastPacketTime > 0 && (millis() - lastPacketTime > FAILSAFE_MS)) {
-    servo.write(SERVO_CENTER);
-    ledcWrite(PWM_PIN, 0);
-    digitalWrite(DIR_FWD_PIN, LOW);
-    digitalWrite(DIR_REV_PIN, LOW);
-    velocita_attuale = 0;
-    velocita_target  = 0;
-    lastPacketTime = 0;
-    Serial.println("FAILSAFE");
+  if (now - lastStatsMs >= STATS_INTERVAL_MS) {
+    lastStatsMs = now;
+    Serial.print("RX_STATS ok=");
+    Serial.print(statPktOk);
+    Serial.print(" lost=");
+    Serial.print(statLost);
+    Serial.print(" dup=");
+    Serial.print(statDup);
+    Serial.print(" crc=");
+    Serial.print(statCrcErr);
+    Serial.print(" token=");
+    Serial.println(statTokenErr);
   }
 
-  // ── Ricezione pacchetto ──
   uint8_t buf[PACKET_SIZE] = {0};
 
   if (activeRadio == RADIO_LORA) {
-    int pktSize = LoRa.parsePacket(PACKET_SIZE);
+    int pktSize = LoRa.parsePacket();
     if (pktSize == PACKET_SIZE) {
       for (int i = 0; i < PACKET_SIZE; i++) buf[i] = LoRa.read();
       processPacket(buf, LoRa.packetRssi());
     }
   }
   else if (activeRadio == RADIO_NRF24) {
-    if (radio.available()) {
+    while (radio.available()) {
       radio.read(buf, PACKET_SIZE);
       processPacket(buf, 0);
     }
   }
 
-  // ── Aggiornamento velocità e motore (ogni 10 ms) ──
-  if (millis() - lastVelocityUpdate >= 40) {
-    lastVelocityUpdate = millis();
+  if (now - lastVelocityUpdate >= MOTOR_TICK_MS) {
+    lastVelocityUpdate = now;
 
-    // 1. Calcolo velocità target
+    unsigned long silence = (lastPacketTime == 0) ? FAILSAFE_MS + 1 : (now - lastPacketTime);
+
+    if (silence > FAILSAFE_MS) {
+      hardStop();
+      return;
+    }
+
+    if (silence > LINK_TIMEOUT_MS) {
+      // Nessun nuovo dato: decelerazione morbida invece di stop istantaneo
+      rx_freno = true;
+      rx_pressione_pedale = 0;
+    }
+
     if (rx_freno) {
       velocita_target = 0;
-      freno_premuto = true;
     }
     else if (rx_retro) {
-      // In retro usiamo la pressione del pedale (0-255), divisa per 2 per sicurezza [cite: 115]
-      velocita_target = -((float)rx_pressione_pedale) / 2.0f;
-      freno_premuto = false;
+      velocita_target = -((float)rx_pressione_pedale) * 0.5f;
     }
     else {
-      // Marcia avanti: mappatura diretta 1:1 dal pedale [cite: 116]
       velocita_target = (float)rx_pressione_pedale;
-      freno_premuto = false;
     }
 
-    // 2. Aggiornamento velocità attuale
-    if (freno_premuto) {
-      if (velocita_attuale > 0)      velocita_attuale -= 2;
-      else if (velocita_attuale < 0) velocita_attuale += 2;
-      if (fabs(velocita_attuale) < 2) velocita_attuale = 0;
-    }
-    else {
-      if (velocita_attuale < velocita_target)      velocita_attuale++;
-      else if (velocita_attuale > velocita_target) velocita_attuale--;
-    }
+    if (velocita_attuale < velocita_target) velocita_attuale += 1.2f;
+    else if (velocita_attuale > velocita_target) velocita_attuale -= (rx_freno ? 2.0f : 1.2f);
 
-    // 3. Output motore
+    if (fabs(velocita_attuale) < 1.0f) velocita_attuale = 0;
+
     int pwmVal = constrain(abs((int)velocita_attuale), 0, 255);
     ledcWrite(PWM_PIN, pwmVal);
 
