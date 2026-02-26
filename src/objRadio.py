@@ -1,15 +1,18 @@
 import os
 import struct
 import time
+from pathlib import Path
 
 import serial
+from serial.tools import list_ports
 
-from src.utils import crc16_ccitt, readfile
+from src.utils import crc16_ccitt, readfile, setUpWorkSpace
 
 
 class RadioController:
     def __init__(self):
-        self.config = readfile(os.path.join(os.path.dirname(__file__), "data", "radioConfig.json"))
+        setUpWorkSpace()
+        self.config = readfile(Path(__file__).resolve().parent / "data" / "radioConfig.json")
         self.ser: serial.Serial | None = None
         self.module = "UNKNOWN"
         self.send_rate = self.config["DEFAULT_SEND_RATE"]
@@ -22,7 +25,7 @@ class RadioController:
     def connect(self, port: str, baud: int) -> bool:
         try:
             self.ser = serial.Serial(port, baud, timeout=self.config.get("SERIAL_TIMEOUT_S", 0.1))
-            time.sleep(1.5)
+            time.sleep(1.0)
             self.ser.reset_input_buffer()
             self.connected = True
             self.consecutive_errors = 0
@@ -31,13 +34,27 @@ class RadioController:
             self.connected = False
             return False
 
+    def auto_connect(self, preferred_port: str | None, baud: int) -> tuple[bool, str | None]:
+        candidates: list[str] = []
+        if preferred_port:
+            candidates.append(preferred_port)
+
+        for p in list_ports.comports():
+            if p.device not in candidates:
+                candidates.append(p.device)
+
+        for port in candidates:
+            if self.connect(port, baud):
+                return True, port
+        return False, None
+
     def send_command(self, cmd: str) -> str | None:
         if not self.ser:
             return None
         try:
             self.ser.reset_input_buffer()
             self.ser.write((cmd + "\n").encode())
-            time.sleep(0.15)
+            time.sleep(0.12)
             resp = self.ser.readline().decode(errors="replace").strip() or None
             self.consecutive_errors = 0
             return resp
@@ -46,12 +63,12 @@ class RadioController:
             return None
 
     def handshake(self) -> bool:
-        for _ in range(3):
+        for _ in range(4):
             resp = self.send_command("HANDSHAKE")
             if resp and resp.startswith("ACK"):
                 self._parse_status(resp.split())
                 return True
-            time.sleep(0.2)
+            time.sleep(0.15)
         return False
 
     def _parse_status(self, parts: list[str]):
@@ -75,7 +92,6 @@ class RadioController:
 
         try:
             self.ser.write(frame)
-            self.ser.flush()
             self.tx_count += 1
             self.consecutive_errors = 0
         except Exception:
@@ -84,10 +100,12 @@ class RadioController:
 
     def poll_messages(self):
         msgs = []
-        while self.ser and self.ser.in_waiting:
+        read_budget = 10
+        while self.ser and self.ser.in_waiting and read_budget > 0:
             line = self.ser.readline().decode(errors="replace").strip()
             if line:
                 msgs.append(line)
+            read_budget -= 1
         return msgs
 
     def has_serial_fault(self) -> bool:

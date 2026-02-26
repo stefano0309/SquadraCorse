@@ -1,6 +1,9 @@
 import argparse
+import statistics
 import sys
 import time
+from collections import deque
+from pathlib import Path
 
 import pygame
 from colorama import Fore, Style, init
@@ -38,32 +41,42 @@ class Controller:
         pygame.init()
         pygame.joystick.init()
 
-        if pygame.joystick.get_count() == 0:
-            print(Fore.RED + "ERRORE: Nessun controller trovato." + Style.RESET_ALL)
-            pygame.quit()
-            raise SystemExit(1)
-
-        self.js = pygame.joystick.Joystick(0)
-        self.js.init()
+        self.js = self._connect_first_joystick()
 
         self.paths, self.presetButton, self.presetAxis = loadWorkSpace()
         self.velocity, self.angle = presetMenu(self.paths["presetIndex"], self.paths["presetPath"])
-        self.config = readfile(self.paths["dataPath"] + "/radioConfig.json")
+        self.config = readfile(Path(self.paths["dataPath"]) / "radioConfig.json")
 
         self.rc = RadioController()
         parser = argparse.ArgumentParser()
-        parser.add_argument("port", nargs="?", default="COM13" if sys.platform == "win32" else "/dev/ttyUSB0")
+        parser.add_argument("port", nargs="?", default=None, help="Porta seriale (es: COM13 o /dev/ttyUSB0)")
+        parser.add_argument("--no-autodetect", action="store_true", help="Disabilita scansione automatica porte seriali")
         args = parser.parse_args()
 
-        if not self.rc.connect(args.port, self.config["SERIAL_BAUD"]):
-            print(Fore.RED + f"ERRORE: connessione seriale fallita su {args.port}" + Style.RESET_ALL)
+        default_port = "COM13" if sys.platform == "win32" else "/dev/ttyUSB0"
+        preferred = args.port or default_port
+
+        if args.no_autodetect:
+            connected = self.rc.connect(preferred, self.config["SERIAL_BAUD"])
+            used_port = preferred if connected else None
+        else:
+            connected, used_port = self.rc.auto_connect(preferred, self.config["SERIAL_BAUD"])
+
+        if not connected:
+            print(Fore.RED + f"ERRORE: connessione seriale fallita (porta preferita: {preferred})" + Style.RESET_ALL)
             raise SystemExit(2)
+
+        print(Fore.GREEN + f"Seriale connessa su: {used_port}" + Style.RESET_ALL)
+
         if not self.rc.handshake():
             print(Fore.RED + "ERRORE: handshake con TX fallito" + Style.RESET_ALL)
             raise SystemExit(3)
 
         setUpVolante(self.js, button_list, axis_list, self.paths["configPath"])
         self.buttons, self.axis = loadMap(self.paths["configPath"])
+        if not self._validate_mapping():
+            print(Fore.RED + "Mappatura non valida: rifai configurazione assi/pulsanti." + Style.RESET_ALL)
+            raise SystemExit(4)
 
         CLEAR()
         INIZIALISE(self.js)
@@ -84,6 +97,50 @@ class Controller:
         self.accel_rise_rate = 0.05
         self.accel_fall_rate = 0.08
         self.steer_rate = 0.10
+        self.last_debug_print = 0.0
+
+        self.axis_filters = {
+            "STEERING": deque(maxlen=5),
+            "ACCELERATOR": deque(maxlen=5),
+            "BRAKE": deque(maxlen=5),
+        }
+        self.accel_inverted = False
+        self.brake_inverted = False
+        self._detect_pedal_orientation()
+
+    def _connect_first_joystick(self):
+        for _ in range(20):
+            pygame.joystick.quit()
+            pygame.joystick.init()
+            if pygame.joystick.get_count() > 0:
+                js = pygame.joystick.Joystick(0)
+                js.init()
+                return js
+            time.sleep(0.1)
+        print(Fore.RED + "ERRORE: Nessun controller trovato." + Style.RESET_ALL)
+        pygame.quit()
+        raise SystemExit(1)
+
+    def _validate_mapping(self) -> bool:
+        required_btn = set(button_list)
+        required_axis = set(axis_list)
+        if not required_btn.issubset(self.buttons) or not required_axis.issubset(self.axis):
+            return False
+
+        max_buttons = self.js.get_numbuttons()
+        max_axes = self.js.get_numaxes()
+        if max_axes <= 0:
+            return False
+
+        for name in required_btn:
+            idx = self.buttons[name]
+            if idx < 0 or idx >= max_buttons:
+                return False
+        for name in required_axis:
+            idx = self.axis[name]
+            if idx < 0 or idx >= max_axes:
+                return False
+        return True
 
     @staticmethod
     def _clamp(value: float, low: float = -1.0, high: float = 1.0) -> float:
@@ -97,7 +154,6 @@ class Controller:
         return scaled if value > 0 else -scaled
 
     def normalize_trigger_axis(self, raw_value: float) -> float:
-        """Converte un asse trigger/pedale da [-1..1] a [0..1]."""
         raw_value = self._clamp(raw_value)
         return (raw_value + 1.0) / 2.0
 
@@ -106,12 +162,55 @@ class Controller:
             return min(target, current + rise)
         return max(target, current - fall)
 
+    def _detect_pedal_orientation(self):
+        samples = {"ACCELERATOR": [], "BRAKE": []}
+        t_end = time.monotonic() + 0.6
+        while time.monotonic() < t_end:
+            pygame.event.pump()
+            for n in samples:
+                idx = self.axis.get(n, -1)
+                if 0 <= idx < self.js.get_numaxes():
+                    samples[n].append(self.js.get_axis(idx))
+            time.sleep(0.01)
+
+        if samples["ACCELERATOR"]:
+            rest = sum(samples["ACCELERATOR"]) / len(samples["ACCELERATOR"])
+            self.accel_inverted = rest > 0.2
+        if samples["BRAKE"]:
+            rest = sum(samples["BRAKE"]) / len(samples["BRAKE"])
+            self.brake_inverted = rest > 0.2
+
+    def _filtered_axis(self, name: str) -> float:
+        raw = self._safe_get_axis(name)
+        buf = self.axis_filters[name]
+        buf.append(raw)
+        if len(buf) < 3:
+            return raw
+        return float(statistics.median(buf))
+
+    def _safe_get_axis(self, name: str) -> float:
+        idx = self.axis.get(name, -1)
+        if idx < 0 or idx >= self.js.get_numaxes():
+            return 0.0
+        return self.js.get_axis(idx)
+
+    def _handle_device_event(self, event):
+        if event.type == pygame.JOYDEVICEREMOVED:
+            print(Fore.YELLOW + "Controller scollegato, attendo riconnessione..." + Style.RESET_ALL)
+            self.start = False
+        elif event.type == pygame.JOYDEVICEADDED:
+            self.js = self._connect_first_joystick()
+            print(Fore.GREEN + f"Controller riconnesso: {self.js.get_name()}" + Style.RESET_ALL)
+
     def run(self):
         while self.running:
             for event in pygame.event.get():
+                self._handle_device_event(event)
                 self.gestioneUscite(event)
                 self.gestioneBottoni(event)
                 self.gestioneAssi(event)
+
+            pygame.event.pump()
 
             if self.start and not self.settings:
                 self.invioDati()
@@ -123,25 +222,20 @@ class Controller:
         pygame.quit()
 
     def invioDati(self):
-        steer_raw = self.js.get_axis(self.axis["STEERING"])
-        accel_raw = self.js.get_axis(self.axis["ACCELERATOR"])
-        brake_raw = self.js.get_axis(self.axis["BRAKE"])
+        steer_raw = self._filtered_axis("STEERING")
+        accel_raw = self._filtered_axis("ACCELERATOR")
+        brake_raw = self._filtered_axis("BRAKE")
 
         steer_target = self.apply_deadzone(steer_raw)
         steer_limit = self.angle / 180.0
         steer_target *= steer_limit
 
-        accel_target = self.normalize_trigger_axis(accel_raw)
-        brake_target = self.normalize_trigger_axis(brake_raw)
+        accel_target = self.normalize_trigger_axis(-accel_raw if self.accel_inverted else accel_raw)
+        brake_target = self.normalize_trigger_axis(-brake_raw if self.brake_inverted else brake_raw)
         accel_target = max(0.0, accel_target - brake_target * 0.6)
 
         self.current_steer = self.smooth_to_target(self.current_steer, steer_target, self.steer_rate, self.steer_rate)
-        self.current_accel = self.smooth_to_target(
-            self.current_accel,
-            accel_target,
-            self.accel_rise_rate,
-            self.accel_fall_rate,
-        )
+        self.current_accel = self.smooth_to_target(self.current_accel, accel_target, self.accel_rise_rate, self.accel_fall_rate)
 
         steer_byte = int((self.current_steer + 1.0) * 127.5)
         accel_byte = int(self.current_accel * 255 * (self.velocity / 100.0))
@@ -157,10 +251,13 @@ class Controller:
         )
 
     def monitor_debug(self):
+        now = time.monotonic()
         for msg in self.rc.poll_messages():
-            print(Fore.MAGENTA + f"[TX/RX] {msg}" + Style.RESET_ALL)
+            if "ERR" in msg or "FAIL" in msg or "NO_RADIO" in msg:
+                print(Fore.RED + f"[TX/RX] {msg}" + Style.RESET_ALL)
 
-        if self.rc.tx_count and self.rc.tx_count % self.config.get("DEBUG_EVERY_N_PACKETS", 30) == 0:
+        if now - self.last_debug_print >= 1.0:
+            self.last_debug_print = now
             fail_ratio = (self.rc.tx_fail / max(1, self.rc.tx_count)) * 100
             print(Fore.CYAN + f"[DEBUG] sent={self.rc.tx_count} fail={self.rc.tx_fail} ({fail_ratio:.1f}%)" + Style.RESET_ALL)
 
