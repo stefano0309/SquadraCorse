@@ -207,34 +207,49 @@ void handleUsbInput() {
     while (progressed) {
       progressed = false;
 
-      if (serialCount >= 1 && serialBuf[0] != BINARY_MARKER) {
-        if (serialBuf[0] >= 32 && serialBuf[0] <= 126) {
-          int nl = -1;
-          for (uint8_t i = 0; i < serialCount; i++) {
-            if (serialBuf[i] == '\n') { nl = i; break; }
-          }
+      if (serialCount == 0) break;
 
-          if (nl >= 0) {
-            String cmd = "";
-            for (int i = 0; i < nl; i++) cmd += (char)serialBuf[i];
-            handleCommand(cmd);
-            for (uint8_t i = nl + 1; i < serialCount; i++) serialBuf[i - (nl + 1)] = serialBuf[i];
-            serialCount -= (uint8_t)(nl + 1);
-            progressed = true;
-            continue;
-          }
+      if (serialBuf[0] == BINARY_MARKER) {
+        if (serialCount < USB_FRAME_SIZE) {
+          // Attendo frame binario completo
+          break;
         }
-
-        for (uint8_t i = 1; i < serialCount; i++) serialBuf[i - 1] = serialBuf[i];
-        serialCount -= 1;
+        _consumeFrameAtStart();
         progressed = true;
         continue;
       }
 
-      if (serialCount >= USB_FRAME_SIZE && serialBuf[0] == BINARY_MARKER) {
-        _consumeFrameAtStart();
+      // Comandi testuali (es. HANDSHAKE + newline)
+      if (serialBuf[0] >= 32 && serialBuf[0] <= 126) {
+        int nl = -1;
+        for (uint8_t i = 0; i < serialCount; i++) {
+          if (serialBuf[i] == '\n') {
+            nl = i;
+            break;
+          }
+        }
+
+        if (nl < 0) {
+          // Riga non completa: non scarto nulla, aspetto altri byte
+          // salvo protezione overflow se una riga non termina mai
+          if (serialCount >= sizeof(serialBuf) - 1) serialCount = 0;
+          break;
+        }
+
+        String cmd = "";
+        for (int i = 0; i < nl; i++) cmd += (char)serialBuf[i];
+        handleCommand(cmd);
+
+        for (uint8_t i = nl + 1; i < serialCount; i++) serialBuf[i - (nl + 1)] = serialBuf[i];
+        serialCount -= (uint8_t)(nl + 1);
         progressed = true;
+        continue;
       }
+
+      // Byte non valido in testa buffer: scarta solo 1 byte e ritenta sync
+      for (uint8_t i = 1; i < serialCount; i++) serialBuf[i - 1] = serialBuf[i];
+      serialCount -= 1;
+      progressed = true;
     }
   }
 }
