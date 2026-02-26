@@ -137,7 +137,7 @@ def writefile(path, data):
 
 def loadWorkSpace():
     setUpWorkSpace()
-    data = readfile(os.getcwd()+"\\src\\data\\setting.json")
+    data = readfile(os.getcwd()+"/src/data/setting.json")
     PATHS = data["paths"]
     BUTTON = data["presetButton"]
     AXIS = data["presetAxis"]
