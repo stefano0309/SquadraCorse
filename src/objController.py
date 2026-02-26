@@ -1,22 +1,39 @@
-import pygame
 import argparse
 import sys
 import time
-from colorama import *
-from src.utils import *
+
+import pygame
+from colorama import Fore, Style, init
+
 from src.objRadio import RadioController
+from src.utils import (
+    CLEAR,
+    INIZIALISE,
+    drawMenu,
+    drawSettingOption,
+    drawSettings,
+    loadMap,
+    loadWorkSpace,
+    presetMenu,
+    readfile,
+    reloadPreset,
+    setUpVolante,
+    settingOption,
+)
 
 init(autoreset=True)
 
-# Definizioni costanti per mappatura e menu
 button_list = ["START", "EXIT", "SETTINGS", "UP", "DOWN", "SELECT", "RETRO_ON", "RETRO_OFF"]
 axis_list = ["STEERING", "ACCELERATOR", "BRAKE"]
-options_list = ["Regolazione massima velocità", 
-                "Regolazione angolo massimo sterzo", 
-                "Reset mappatura tasti",
-                "Salva preset impostazioni"]
+options_list = [
+    "Regolazione massima velocità",
+    "Regolazione angolo massimo sterzo",
+    "Reset mappatura tasti",
+    "Salva preset impostazioni",
+]
 
-class Controller():
+
+class Controller:
     def __init__(self):
         pygame.init()
         pygame.joystick.init()
@@ -24,42 +41,33 @@ class Controller():
         if pygame.joystick.get_count() == 0:
             print(Fore.RED + "ERRORE: Nessun controller trovato." + Style.RESET_ALL)
             pygame.quit()
-            quit()
+            raise SystemExit(1)
 
         self.js = pygame.joystick.Joystick(0)
         self.js.init()
 
-        # --- Caricamento Workspace e Preset ---
-        PATHS, BUTTON_PRESET, AXIS_PRESET = loadWorkSpace()
-        # Carica velocity (0-100%) e angle (gradi) dal file presetIndex/presetPath
-        self.velocity, self.angle = presetMenu(PATHS["presetIndex"], PATHS["presetPath"])
-        
-        self.paths = PATHS
-        self.presetButton = BUTTON_PRESET
-        self.presetAxis = AXIS_PRESET
-
-        self.config = readfile(os.getcwd()+"\\src\\data\\radioConfig.json")
+        self.paths, self.presetButton, self.presetAxis = loadWorkSpace()
+        self.velocity, self.angle = presetMenu(self.paths["presetIndex"], self.paths["presetPath"])
+        self.config = readfile(self.paths["dataPath"] + "/radioConfig.json")
 
         self.rc = RadioController()
         parser = argparse.ArgumentParser()
         parser.add_argument("port", nargs="?", default="COM13" if sys.platform == "win32" else "/dev/ttyUSB0")
         args = parser.parse_args()
 
-        self.rc.connect(args.port, self.config['SERIAL_BAUD'])
-        self.rc.handshake()
+        if not self.rc.connect(args.port, self.config["SERIAL_BAUD"]):
+            print(Fore.RED + f"ERRORE: connessione seriale fallita su {args.port}" + Style.RESET_ALL)
+            raise SystemExit(2)
+        if not self.rc.handshake():
+            print(Fore.RED + "ERRORE: handshake con TX fallito" + Style.RESET_ALL)
+            raise SystemExit(3)
 
-        # --- Configurazione Mappatura Hardware ---
-        #buttonMap(self.presetButton, self.presetAxis, button_list, axis_list, self.paths["configPath"])
         setUpVolante(self.js, button_list, axis_list, self.paths["configPath"])
-        
-        buttonMp, axisMp = loadMap(self.paths["configPath"])
+        self.buttons, self.axis = loadMap(self.paths["configPath"])
+
         CLEAR()
         INIZIALISE(self.js)
-        
-        self.buttons = buttonMp
-        self.axis = axisMp
 
-        # --- Stato Interno ---
         self.running = True
         self.firstStart = True
         self.start = False
@@ -69,75 +77,97 @@ class Controller():
         self.selected = 0
         self.position = 0
         self.option_selected = options_list
-        
-        # SOGLIA DRIFT (Deadzone)
-        self.deadzone = 0.08  # Ignora input inferiori all'8%
 
-    def apply_deadzone(self, value):
-        """Applica zona morta e riscala l'input per fluidità."""
+        self.deadzone = 0.05
+        self.current_accel = 0.0
+        self.current_steer = 0.0
+        self.accel_rise_rate = 0.05
+        self.accel_fall_rate = 0.08
+        self.steer_rate = 0.10
+
+    @staticmethod
+    def _clamp(value: float, low: float = -1.0, high: float = 1.0) -> float:
+        return max(low, min(high, value))
+
+    def apply_deadzone(self, value: float) -> float:
+        value = self._clamp(value)
         if abs(value) < self.deadzone:
             return 0.0
-        # Riscalatura: trasforma [deadzone, 1.0] in [0.0, 1.0]
-        return (value - (self.deadzone if value > 0 else -self.deadzone)) / (1.0 - self.deadzone)
+        scaled = (abs(value) - self.deadzone) / (1.0 - self.deadzone)
+        return scaled if value > 0 else -scaled
+
+    def normalize_trigger_axis(self, raw_value: float) -> float:
+        """Converte un asse trigger/pedale da [-1..1] a [0..1]."""
+        raw_value = self._clamp(raw_value)
+        return (raw_value + 1.0) / 2.0
+
+    def smooth_to_target(self, current: float, target: float, rise: float, fall: float) -> float:
+        if target > current:
+            return min(target, current + rise)
+        return max(target, current - fall)
 
     def run(self):
-        """Loop principale dell'applicazione."""
         while self.running:
             for event in pygame.event.get():
                 self.gestioneUscite(event)
                 self.gestioneBottoni(event)
                 self.gestioneAssi(event)
-            
-            # Invio dati binari se il sistema è attivo
+
             if self.start and not self.settings:
                 self.invioDati()
-                time.sleep(0.02) 
-                    
-        if self.rc: 
+                self.monitor_debug()
+                time.sleep(0.02)
+
+        if self.rc:
             self.rc.close()
         pygame.quit()
 
     def invioDati(self):
-        # 1. Lettura dei valori dagli assi con applicazione della Deadzone
-        # Pygame restituisce valori da -1.0 a 1.0
-        raw_steer = self.apply_deadzone(self.js.get_axis(self.axis["STEERING"]))
-        raw_accel = self.apply_deadzone(self.js.get_axis(self.axis["ACCELERATOR"]))
-        raw_brake = self.apply_deadzone(self.js.get_axis(self.axis["BRAKE"]))
+        steer_raw = self.js.get_axis(self.axis["STEERING"])
+        accel_raw = self.js.get_axis(self.axis["ACCELERATOR"])
+        brake_raw = self.js.get_axis(self.axis["BRAKE"])
 
-        # 2. Mappatura dello sterzo (0-255, centro 128)
-        steer_byte = int((raw_steer + 1.0) / 2.0 * 255)
+        steer_target = self.apply_deadzone(steer_raw)
+        steer_limit = self.angle / 180.0
+        steer_target *= steer_limit
 
-        # 3. Mappatura Acceleratore con limite di potenza (self.velocity)
-        # Convertiamo l'input in 0-255 e poi lo scaliamo per la percentuale impostata
-        accel_raw = int((raw_accel + 1.0) / 2.0 * 255)
-        power_limit = self.velocity / 100.0
-        accel_byte = int(accel_raw * power_limit)
+        accel_target = self.normalize_trigger_axis(accel_raw)
+        brake_target = self.normalize_trigger_axis(brake_raw)
+        accel_target = max(0.0, accel_target - brake_target * 0.6)
 
-        # 4. Mappatura Freno
-        brake_byte = int((raw_brake + 1.0) / 2.0 * 255)
-
-        # 5. Vincoli di sicurezza (Clamp)
-        steer_byte = max(0, min(255, steer_byte))
-        accel_byte = max(0, min(255, accel_byte))
-        brake_byte = max(0, min(255, brake_byte))
-
-        # 6. Logica Freno e Retromarcia
-        # Consideriamo il freno "attivo" se premuto oltre una certa soglia
-        is_braking = brake_byte > 20 
-        
-        # 7. Invio dei dati tramite il modulo radio
-        # Passiamo 0 come 'speed_sel' perché la logica marce è stata eliminata
-        # e gestita direttamente dallo scaling dell'accel_byte qui sopra.
-        self.rc.send_data(
-            steer=steer_byte, 
-            accel=accel_byte, 
-            brake=is_braking, 
-            speed_sel=0, 
-            reverse=self.retromarcia, 
-            commands=0
+        self.current_steer = self.smooth_to_target(self.current_steer, steer_target, self.steer_rate, self.steer_rate)
+        self.current_accel = self.smooth_to_target(
+            self.current_accel,
+            accel_target,
+            self.accel_rise_rate,
+            self.accel_fall_rate,
         )
 
-    # --- Gestione Eventi ---
+        steer_byte = int((self.current_steer + 1.0) * 127.5)
+        accel_byte = int(self.current_accel * 255 * (self.velocity / 100.0))
+        brake_active = brake_target > 0.15
+
+        self.rc.send_data(
+            steer=max(0, min(255, steer_byte)),
+            accel=max(0, min(255, accel_byte)),
+            brake=brake_active,
+            speed_sel=0,
+            reverse=self.retromarcia,
+            commands=0,
+        )
+
+    def monitor_debug(self):
+        for msg in self.rc.poll_messages():
+            print(Fore.MAGENTA + f"[TX/RX] {msg}" + Style.RESET_ALL)
+
+        if self.rc.tx_count and self.rc.tx_count % self.config.get("DEBUG_EVERY_N_PACKETS", 30) == 0:
+            fail_ratio = (self.rc.tx_fail / max(1, self.rc.tx_count)) * 100
+            print(Fore.CYAN + f"[DEBUG] sent={self.rc.tx_count} fail={self.rc.tx_fail} ({fail_ratio:.1f}%)" + Style.RESET_ALL)
+
+        if self.rc.has_serial_fault():
+            print(Fore.RED + "[ERRORE] Troppi errori seriali consecutivi, stop sicurezza." + Style.RESET_ALL)
+            self.start = False
+
     def gestioneUscite(self, event):
         if event.type == pygame.QUIT:
             self.running = False
@@ -147,18 +177,15 @@ class Controller():
     def gestioneBottoni(self, event):
         if event.type != pygame.JOYBUTTONDOWN:
             return
-        
+
         if event.button == self.buttons["RETRO_ON"]:
             self.retromarcia = True
             print(Fore.CYAN + "RETROMARCIA: ON" + Style.RESET_ALL)
-            
         elif event.button == self.buttons["RETRO_OFF"]:
             self.retromarcia = False
             print(Fore.CYAN + "RETROMARCIA: OFF" + Style.RESET_ALL)
-
         elif event.button == self.buttons["START"]:
             self.gestioneInizio()
-        
         elif event.button == self.buttons["EXIT"]:
             self.gestioneUsciteBottoni()
 
@@ -166,17 +193,16 @@ class Controller():
             self.gestioneBottoniImpostazioni(event)
         elif event.button == self.buttons["SETTINGS"] and not self.start:
             self.gestioneImpostazioni()
-    
+
     def gestioneAssi(self, event):
         if event.type != pygame.JOYAXISMOTION:
             return
 
-        # Navigazione menu impostazioni tramite assi
         if self.settings and self.selectItem:
-            if self.selected == 0: # Velocità
-                self.position, self.velocity = settingOption(event.value, self.position, 100, 0, self.velocity, self.selected, 0, 5, self.option_selected)
-            elif self.selected == 1: # Angolo
-                self.position, self.angle = settingOption(event.value, self.position, 180, 0, self.angle, self.selected, 1, 9, self.option_selected)
+            if self.selected == 0:
+                self.position, self.velocity = settingOption(event.value, self.position, 100, 1, self.velocity, self.selected, 0, 5, self.option_selected)
+            elif self.selected == 1:
+                self.position, self.angle = settingOption(event.value, self.position, 180, 1, self.angle, self.selected, 1, 9, self.option_selected)
 
     def gestioneInizio(self):
         if self.firstStart:
@@ -187,7 +213,7 @@ class Controller():
         else:
             self.start = not self.start
             drawMenu()
-    
+
     def gestioneUsciteBottoni(self):
         if not self.start and not self.settings:
             self.running = False
@@ -195,26 +221,24 @@ class Controller():
             self.settings = False
             self.selectItem = False
             drawMenu()
-            
+
     def gestioneImpostazioni(self):
         self.settings = True
         self.selected = 0
         drawSettings(self.selected, self.option_selected)
-    
+
     def gestioneBottoniImpostazioni(self, event):
         if event.button == self.buttons["UP"]:
             self.selectItem = False
             self.selected = max(0, self.selected - 1)
             drawSettings(self.selected, self.option_selected)
-
         elif event.button == self.buttons["DOWN"]:
             self.selectItem = False
             self.selected = min(len(self.option_selected) - 1, self.selected + 1)
             drawSettings(self.selected, self.option_selected)
-
         elif event.button == self.buttons["SELECT"]:
             self.gestioneOpzioniImpostazioni()
-    
+
     def gestioneOpzioniImpostazioni(self):
         if self.selectItem:
             self.selectItem = False
@@ -223,16 +247,19 @@ class Controller():
 
         self.selectItem = True
         CLEAR()
-        if self.selected == 2: # Reset Mappatura
+        if self.selected == 2:
             setUpVolante(self.js, button_list, axis_list, self.paths["configPath"])
             self.buttons, self.axis = loadMap(self.paths["configPath"])
             self.settings = False
             drawMenu()
-        elif self.selected == 3: # Salva Preset
+        elif self.selected == 3:
             presetMenu(self.paths["presetIndex"], self.paths["presetPath"], self.velocity, self.angle)
+            self.velocity, self.angle = reloadPreset(self.paths["presetIndex"], self.paths["presetPath"])
             self.selectItem = False
             drawSettings(self.selected, self.option_selected)
         else:
             drawSettings(self.selected, self.option_selected)
-            if self.selected == 0: drawSettingOption(0, 100, self.velocity, 5)
-            if self.selected == 1: drawSettingOption(0, 180, self.angle, 9)
+            if self.selected == 0:
+                drawSettingOption(1, 100, self.velocity, 5)
+            if self.selected == 1:
+                drawSettingOption(1, 180, self.angle, 9)
