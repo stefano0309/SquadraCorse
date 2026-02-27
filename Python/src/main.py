@@ -175,11 +175,11 @@ def main():
                     rate_timer = now
 
                 volante = js.get_axis(assi.get("STERZO", 0))
-                accel = (js.get_axis(assi.get("ACCELERATORE", 0)) +1 ) /2
-                freno = (js.get_axis(assi.get("FRENO", 0)) +1) /2
+                accel = js.get_axis(assi.get("ACCELERATORE", 0))
+                freno = js.get_axis(assi.get("FRENO", 0))
 
-                steer_byte = max(0, min(255, int((volante + 1.0) * 127.5)))
-                accel_byte = max(0, min(255, int((accel + 1.0) / 2 * 255)))
+                steer_byte = max(0, min(255, int(((volante + 1.0)/2) * 127.5)))
+                accel_byte = max(0, min(255, int(((accel + 1.0)/2) / 2 * 255)))
                 brake_pressed = (freno + 1.0) / 2 > 0.10
 
                 if rc.connected:
