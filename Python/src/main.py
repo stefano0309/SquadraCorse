@@ -175,16 +175,15 @@ def main():
                     rate_timer = now
 
 
-                
-
                 volante = js.get_axis(assi.get("STERZO", 0))
                 accel = js.get_axis(assi.get("ACCELERATORE", 0))
                 freno = js.get_axis(assi.get("FRENO", 0))
 
-                accel_norm = (accel +1) / 2
+                accel_norm = int(((accel +1) / 2 * 255))
                 #freno_norm = (freno +1) / 2
 
-                accel_byte = int(accel_norm * 255)
+                accel_byte = 255-accel_norm
+                accel_byte = max(0, min(255, accel_byte))
  
                 steer_byte = max(0, min(255, int(((volante + 1.0)/2) * 127.5)))
                 #accel_byte = max(0, min(255, int(((accel + 1.0)/2) / 2 * 255)))
