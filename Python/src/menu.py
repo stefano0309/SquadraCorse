@@ -11,9 +11,6 @@ MENU_ITEMS = [
     {"label": "Livelli Velocità",   "key": "max_speeds","type": "slider", "min": 0,   "max": 16,  "step": 1},
     {"label": "Angolo Max Sterzo",  "key": "STEERING_MAX_ANGLE", "type": "slider", "min": 10, "max": 180, "step": 5},
     {"label": "Gradi Volante",      "key": "WHEEL_RANGE_DEGREES","type": "slider", "min": 90, "max": 900, "step": 10},
-    {"label": "Rampa Accel. ↑",     "key": "ACCEL_RAMP_UP",     "type": "slider", "min": 10,  "max": 500, "step": 10},
-    {"label": "Rilascio Accel. ↓",  "key": "ACCEL_RAMP_DOWN",   "type": "slider", "min": 10,  "max": 300, "step": 5},
-    {"label": "Rampa Freno ↓",      "key": "BRAKE_RAMP_DOWN",   "type": "slider", "min": 50,  "max": 1000,"step": 25},
     {"label": "Calibra Zero Servo", "key": "calibrate",  "type": "action"},
     {"label": "Porta Seriale",      "key": "serial_port", "type": "info"},
     {"label": "Rimappa Controller", "key": "remap",       "type": "action"},
@@ -321,7 +318,7 @@ def run_menu(js, pulsanti: dict, assi: dict, rc: RadioController, cfg: dict) -> 
             return None
 
     # Chiavi che vanno persistite in config.json
-    CONFIG_BACKED_KEYS = {"STEERING_MAX_ANGLE", "WHEEL_RANGE_DEGREES", "ACCEL_RAMP_UP", "ACCEL_RAMP_DOWN", "BRAKE_RAMP_DOWN"}
+    CONFIG_BACKED_KEYS = {"STEERING_MAX_ANGLE", "WHEEL_RANGE_DEGREES"}
 
     def adjust_current(delta: int) -> bool:
         item = MENU_ITEMS[cursor]

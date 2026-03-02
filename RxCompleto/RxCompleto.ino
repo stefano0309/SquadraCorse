@@ -62,9 +62,12 @@ const int SERVO_CENTER = 90;
 #define SPEED_LEVELS         10
 
 // ── Rampe motore (unità PWM per tick di UPDATE_INTERVAL_MS) ──
-#define ACCEL_RATE          6.0f   // accelerazione verso target
-#define DECEL_COAST         3.0f   // rilascio acceleratore (coast)
-#define DECEL_BRAKE        15.0f   // frenata attiva
+#define ACCEL_RATE          2.5f   // accelerazione verso target (~2s per 0→max)
+#define DECEL_COAST         1.2f   // rilascio acceleratore – coast molto dolce (~4s)
+#define DECEL_BRAKE         8.0f   // frenata attiva – rapida ma graduale (~0.6s)
+
+// ── Rampa cambio marcia (% per tick) ──
+#define SPEED_PCT_RATE      1.5f   // quanto veloce cambia speed_pct_smooth (~1.3s per 0→100%)
 
 // ── Soglia minima PWM per vincere l'attrito statico ──
 #define MOTOR_MIN_PWM       25
@@ -90,6 +93,7 @@ bool    rx_freno             = false;
 bool    rx_retro             = false;
 uint8_t rx_pressione_pedale  = 0;
 uint8_t rx_speed_pct         = 10;     // percentuale velocità max (10-100)
+float   speed_pct_smooth     = 10.0f;  // versione interpolata di rx_speed_pct
 float   velocita_target      = 0;
 float   velocita_attuale     = 0;
 
@@ -272,6 +276,7 @@ void loop() {
     digitalWrite(DIR_REV_PIN, LOW);
     velocita_attuale = 0;
     velocita_target  = 0;
+    speed_pct_smooth = 10.0f;
     lastPacketTime = 0;
     Serial.println("FAILSAFE");
   }
@@ -313,8 +318,17 @@ void loop() {
                                      (float)(SERVO_CENTER + STEER_ANGLE_MAX));
     servo.write((int)(servo_current_angle + 0.5f));
 
+    // ═══ INTERPOLAZIONE MARCIA (speed_pct) ═══
+    float pctTarget = (float)rx_speed_pct;
+    float pctDiff   = pctTarget - speed_pct_smooth;
+    if (fabs(pctDiff) < SPEED_PCT_RATE) {
+      speed_pct_smooth = pctTarget;
+    } else {
+      speed_pct_smooth += copysignf(SPEED_PCT_RATE, pctDiff);
+    }
+
     // ═══ CALCOLO VELOCITA TARGET ═══
-    float max_pwm = 255.0f * rx_speed_pct / 100.0f;
+    float max_pwm = 255.0f * speed_pct_smooth / 100.0f;
 
     if (rx_retro) {
       velocita_target = -(rx_pressione_pedale / 255.0f) * max_pwm * REVERSE_MULTIPLIER;
@@ -322,9 +336,9 @@ void loop() {
       velocita_target = (rx_pressione_pedale / 255.0f) * max_pwm;
     }
 
-    // ═══ RAMPA VELOCITA (freno ≫ coast) ═══
+    // ═══ RAMPA VELOCITA (freno ≫ coast ≫ accel) ═══
     if (rx_freno) {
-      // Frenata attiva: decelerazione molto rapida verso 0
+      // Frenata attiva: decelerazione rapida ma graduale verso 0
       if (fabs(velocita_attuale) <= DECEL_BRAKE) {
         velocita_attuale = 0;
       } else {
@@ -332,12 +346,20 @@ void loop() {
       }
     } else {
       float diff = velocita_target - velocita_attuale;
-      if (fabs(diff) < 1.0f) {
+      if (fabs(diff) < 0.5f) {
         velocita_attuale = velocita_target;
       } else {
-        // Accelerazione rapida, coast lenta
         bool accelerating = (fabs(velocita_target) >= fabs(velocita_attuale));
-        float rate = accelerating ? ACCEL_RATE : DECEL_COAST;
+        float rate;
+        if (accelerating) {
+          // Easing in: più lenta all'inizio, poi cresce
+          float progress = fabs(velocita_attuale) / max(fabs(velocita_target), 1.0f);
+          rate = ACCEL_RATE * (0.4f + 0.6f * progress);
+          rate = max(rate, ACCEL_RATE * 0.4f);  // rate minimo
+        } else {
+          // Coast: decelerazione molto dolce
+          rate = DECEL_COAST;
+        }
         float step = min(fabs(diff), rate);
         velocita_attuale += copysignf(step, diff);
       }
