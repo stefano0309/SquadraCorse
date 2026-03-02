@@ -2,7 +2,8 @@ import sys
 from radio_controller import RadioController
 
 # ══════════════ DISPLAY ══════════════
-def display(rc: RadioController, volante: float, accel: float, brake: float,
+def display(rc: RadioController, steer_deg: float, servo_offset: float, steering_max: float,
+            accel: float, brake: float,
             speed_sel: int, reverse: bool, actual_rate: float, log_lines: list, max_speeds: int):
     mod_str = {
         "LORA": f"LoRa 433 MHz  |  TX Power: {rc.tx_power} dBm",
@@ -24,7 +25,7 @@ def display(rc: RadioController, volante: float, accel: float, brake: float,
         pad(f"  Seriale    : {conn_str}"),
         pad(f"  Frequenza  : {actual_rate:.0f} / {rc.send_rate} Hz"),
         pad(f"  Pacchetti  : {rc.tx_count}  errori: {rc.tx_fail}"), mid,
-        pad(f"  Sterzo     : {volante:+6.2f}"),
+        pad(f"  Sterzo     : {steer_deg:+6.1f}°  (offset {servo_offset:+.1f}°)"),
         pad(f"  Acceleraz. : {accel:6.2f}"),
         pad(f"  Freno      : {brake:6.2f}"),
         pad(f"  Vel. Max   : {(1 + speed_sel) * 10}%  [{'RETRO' if reverse else 'AVANTI'}]"), mid,

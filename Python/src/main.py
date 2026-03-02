@@ -11,6 +11,9 @@ with open(pathlib.Path(__file__).parent / "config.json") as f:
 SERIAL_BAUD = config['SERIAL_BAUD']
 MAX_SPEEDS = config['MAX_SPEEDS']
 DISPLAY_REFRESH_S = config['DISPLAY_REFRESH_S']
+SERVO_ZERO_OFFSET = config.get('SERVO_ZERO_OFFSET', 0)
+STEERING_MAX_ANGLE = config.get('STEERING_MAX_ANGLE', 90)
+WHEEL_RANGE_DEGREES = config.get('WHEEL_RANGE_DEGREES', 450)
 
 from utils import clear_once
 from mapping import load_mapping, save_mapping
@@ -93,7 +96,9 @@ def main():
     reverse = False
     commands = 0
     log_lines: list[str] = []
-    cfg = {"tx_power": rc.tx_power, "send_rate": rc.send_rate, "max_speeds": max_speeds, "serial_port": args.port}
+    cfg = {"tx_power": rc.tx_power, "send_rate": rc.send_rate, "max_speeds": max_speeds, "serial_port": args.port,
+           "SERVO_ZERO_OFFSET": SERVO_ZERO_OFFSET, "STEERING_MAX_ANGLE": STEERING_MAX_ANGLE,
+           "WHEEL_RANGE_DEGREES": WHEEL_RANGE_DEGREES}
 
     intervallo = 1.0 / max(1, rc.send_rate)
     ultimo_invio = 0.0
@@ -101,6 +106,11 @@ def main():
     rate_timer = time.time()
     actual_rate = 0.0
     last_display = 0.0
+
+    # Parametri servo (copie locali mutabili, aggiornate dal menu)
+    servo_zero_offset = SERVO_ZERO_OFFSET
+    steering_max_angle = STEERING_MAX_ANGLE
+    wheel_range_degrees = WHEEL_RANGE_DEGREES
 
     # soglia pressione per eseguire azioni al rilascio
     press_threshold = 0.02
@@ -113,6 +123,7 @@ def main():
     volante = 0.0
     accel = -1.0
     freno = -1.0
+    steer_deg = 0.0
 
     try:
         while True:
@@ -140,10 +151,14 @@ def main():
                                     reverse = not reverse
                                     log_lines.append("RETRO ON" if reverse else "RETRO OFF")
                                 elif nome == "MENU":
-                                    cfg = run_menu(js, pulsanti, rc, cfg)
+                                    cfg = run_menu(js, pulsanti, assi, rc, cfg)
                                     max_speeds = cfg.get("max_speeds", MAX_SPEEDS)
                                     speed_sel = min(speed_sel, max_speeds - 1)
                                     intervallo = 1.0 / max(1, rc.send_rate)
+                                    # Aggiorna parametri servo dal cfg (possono essere cambiati nel menu)
+                                    servo_zero_offset = cfg.get("SERVO_ZERO_OFFSET", SERVO_ZERO_OFFSET)
+                                    steering_max_angle = cfg.get("STEERING_MAX_ANGLE", STEERING_MAX_ANGLE)
+                                    wheel_range_degrees = cfg.get("WHEEL_RANGE_DEGREES", WHEEL_RANGE_DEGREES)
                                     log_lines.append("Menu chiuso")
                                     if cfg.pop("_need_remap", False):
                                         assi = scopri_assi(js)
@@ -182,12 +197,15 @@ def main():
                 freno = js.get_axis(assi.get("FRENO", 0))
 
                 accel_norm = (accel +1) / 2
-                #freno_norm = (freno +1) / 2
 
                 accel_byte = int(accel_norm * 255)
- 
-                steer_byte = max(0, min(255, int(((volante + 1.0)/2) * 127.5)))
-                #accel_byte = max(0, min(255, int(((accel + 1.0)/2) / 2 * 255)))
+
+                # Conversione sterzo: asse → gradi → clamp a ±STEERING_MAX → applica offset → byte
+                wheel_deg = volante * (wheel_range_degrees / 2)
+                steer_deg = max(-steering_max_angle, min(steering_max_angle, wheel_deg))
+                output_deg = steer_deg + servo_zero_offset
+                steer_byte = int(((output_deg + steering_max_angle) / (2 * steering_max_angle)) * 255)
+                steer_byte = max(0, min(255, steer_byte))
                 brake_pressed = (freno + 1.0) / 2 > 0.10
 
                 if rc.connected:
@@ -196,7 +214,8 @@ def main():
             # Display
             if now - last_display >= DISPLAY_REFRESH_S:
                 last_display = now
-                display(rc, volante, (accel + 1) / 2, (freno + 1) / 2,
+                display(rc, steer_deg, servo_zero_offset, steering_max_angle,
+                        (accel + 1) / 2, (freno + 1) / 2,
                         speed_sel, reverse, actual_rate, log_lines, max_speeds)
                 if len(log_lines) > 50:
                     log_lines = log_lines[-20:]
