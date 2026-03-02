@@ -14,6 +14,9 @@ DISPLAY_REFRESH_S = config['DISPLAY_REFRESH_S']
 SERVO_ZERO_OFFSET = config.get('SERVO_ZERO_OFFSET', 0)
 STEERING_MAX_ANGLE = config.get('STEERING_MAX_ANGLE', 90)
 WHEEL_RANGE_DEGREES = config.get('WHEEL_RANGE_DEGREES', 450)
+ACCEL_RAMP_UP = config.get('ACCEL_RAMP_UP', 150)
+ACCEL_RAMP_DOWN = config.get('ACCEL_RAMP_DOWN', 60)
+BRAKE_RAMP_DOWN = config.get('BRAKE_RAMP_DOWN', 500)
 
 from utils import clear_once
 from mapping import load_mapping, save_mapping
@@ -98,7 +101,9 @@ def main():
     log_lines: list[str] = []
     cfg = {"tx_power": rc.tx_power, "send_rate": rc.send_rate, "max_speeds": max_speeds, "serial_port": args.port,
            "SERVO_ZERO_OFFSET": SERVO_ZERO_OFFSET, "STEERING_MAX_ANGLE": STEERING_MAX_ANGLE,
-           "WHEEL_RANGE_DEGREES": WHEEL_RANGE_DEGREES}
+           "WHEEL_RANGE_DEGREES": WHEEL_RANGE_DEGREES,
+           "ACCEL_RAMP_UP": ACCEL_RAMP_UP, "ACCEL_RAMP_DOWN": ACCEL_RAMP_DOWN,
+           "BRAKE_RAMP_DOWN": BRAKE_RAMP_DOWN}
 
     intervallo = 1.0 / max(1, rc.send_rate)
     ultimo_invio = 0.0
@@ -111,6 +116,15 @@ def main():
     servo_zero_offset = SERVO_ZERO_OFFSET
     steering_max_angle = STEERING_MAX_ANGLE
     wheel_range_degrees = WHEEL_RANGE_DEGREES
+
+    # Parametri rampa accelerazione (unità/secondo su scala 0-255)
+    accel_ramp_up = ACCEL_RAMP_UP
+    accel_ramp_down = ACCEL_RAMP_DOWN
+    brake_ramp_down = BRAKE_RAMP_DOWN
+
+    # Valore smoothed dell'accelerazione (0.0 - 255.0)
+    smoothed_accel = 0.0
+    prev_send_time = time.time()
 
     # soglia pressione per eseguire azioni al rilascio
     press_threshold = 0.02
@@ -159,6 +173,9 @@ def main():
                                     servo_zero_offset = cfg.get("SERVO_ZERO_OFFSET", SERVO_ZERO_OFFSET)
                                     steering_max_angle = cfg.get("STEERING_MAX_ANGLE", STEERING_MAX_ANGLE)
                                     wheel_range_degrees = cfg.get("WHEEL_RANGE_DEGREES", WHEEL_RANGE_DEGREES)
+                                    accel_ramp_up = cfg.get("ACCEL_RAMP_UP", ACCEL_RAMP_UP)
+                                    accel_ramp_down = cfg.get("ACCEL_RAMP_DOWN", ACCEL_RAMP_DOWN)
+                                    brake_ramp_down = cfg.get("BRAKE_RAMP_DOWN", BRAKE_RAMP_DOWN)
                                     log_lines.append("Menu chiuso")
                                     if cfg.pop("_need_remap", False):
                                         assi = scopri_assi(js)
@@ -196,9 +213,29 @@ def main():
                 accel = js.get_axis(assi.get("ACCELERATORE", 0))
                 freno = js.get_axis(assi.get("FRENO", 0))
 
-                accel_norm = (accel +1) / 2
+                # --- Delta tempo per rampa frame-rate-indipendente ---
+                dt = now - prev_send_time
+                prev_send_time = now
 
-                accel_byte = int(accel_norm * 255)
+                accel_target = ((accel + 1) / 2) * 255.0   # 0-255
+                brake_norm = (freno + 1.0) / 2
+                brake_pressed = brake_norm > 0.10
+
+                # --- Rampa accelerazione ---
+                if brake_pressed:
+                    # Freno: decelera velocemente (proporzionale alla pressione freno)
+                    ramp = brake_ramp_down * brake_norm * dt
+                    smoothed_accel = max(0.0, smoothed_accel - ramp)
+                elif accel_target > smoothed_accel:
+                    # Accelera: rampa graduale verso l'alto
+                    ramp = accel_ramp_up * dt
+                    smoothed_accel = min(accel_target, smoothed_accel + ramp)
+                else:
+                    # Rilascio acceleratore: ritorno lento a 0
+                    ramp = accel_ramp_down * dt
+                    smoothed_accel = max(accel_target, smoothed_accel - ramp)
+
+                accel_byte = max(0, min(255, int(smoothed_accel)))
 
                 # Conversione sterzo: asse → gradi → clamp a ±STEERING_MAX → applica offset → byte
                 wheel_deg = volante * (wheel_range_degrees / 2)
@@ -206,7 +243,6 @@ def main():
                 output_deg = steer_deg + servo_zero_offset
                 steer_byte = int(((output_deg + steering_max_angle) / (2 * steering_max_angle)) * 255)
                 steer_byte = max(0, min(255, steer_byte))
-                brake_pressed = (freno + 1.0) / 2 > 0.10
 
                 if rc.connected:
                     rc.send_data(steer_byte, accel_byte, brake_pressed, speed_sel, reverse, commands)
@@ -215,7 +251,7 @@ def main():
             if now - last_display >= DISPLAY_REFRESH_S:
                 last_display = now
                 display(rc, steer_deg, servo_zero_offset, steering_max_angle,
-                        (accel + 1) / 2, (freno + 1) / 2,
+                        smoothed_accel / 255.0, (freno + 1) / 2,
                         speed_sel, reverse, actual_rate, log_lines, max_speeds)
                 if len(log_lines) > 50:
                     log_lines = log_lines[-20:]

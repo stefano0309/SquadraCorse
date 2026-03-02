@@ -1,6 +1,11 @@
 import sys
 from radio_controller import RadioController
 
+def _bar(val: float, width: int = 20) -> str:
+    """Return an ASCII bar like [████░░░░░░] for a 0-1 value."""
+    filled = int(max(0.0, min(1.0, val)) * width)
+    return '[' + '█' * filled + '░' * (width - filled) + ']'
+
 # ══════════════ DISPLAY ══════════════
 def display(rc: RadioController, steer_deg: float, servo_offset: float, steering_max: float,
             accel: float, brake: float,
@@ -26,8 +31,8 @@ def display(rc: RadioController, steer_deg: float, servo_offset: float, steering
         pad(f"  Frequenza  : {actual_rate:.0f} / {rc.send_rate} Hz"),
         pad(f"  Pacchetti  : {rc.tx_count}  errori: {rc.tx_fail}"), mid,
         pad(f"  Sterzo     : {steer_deg:+6.1f}°  (offset {servo_offset:+.1f}°)"),
-        pad(f"  Acceleraz. : {accel:6.2f}"),
-        pad(f"  Freno      : {brake:6.2f}"),
+        pad(f"  Potenza    : {_bar(accel, 20)} {accel * 100:5.1f}%"),
+        pad(f"  Freno      : {_bar(brake, 20)} {brake * 100:5.1f}%"),
         pad(f"  Vel. Max   : {(1 + speed_sel) * 10}%  [{'RETRO' if reverse else 'AVANTI'}]"), mid,
     ]
     for i in range(4):
