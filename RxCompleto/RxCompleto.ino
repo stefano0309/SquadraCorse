@@ -65,7 +65,6 @@ const int SERVO_CENTER = 90;
 #define ACCEL_RATE          2.5f   // accelerazione verso target (~2s per 0→max)
 #define DECEL_COAST         1.2f   // rilascio acceleratore – coast molto dolce (~4s)
 #define DECEL_BRAKE         4.0f   // frenata attiva – graduale (~1.3s)
-#define DECEL_DIR_CHANGE    0.8f   // transizione avanti↔retro – molto lenta (~6s)
 
 // ── Rampa cambio marcia (% per tick) ──
 #define SPEED_PCT_RATE      1.5f   // quanto veloce cambia speed_pct_smooth (~1.3s per 0→100%)
@@ -98,10 +97,10 @@ float   speed_pct_smooth     = 10.0f;  // versione interpolata di rx_speed_pct
 float   velocita_target      = 0;
 float   velocita_attuale     = 0;
 
-// ── Pausa cambio direzione ──
-unsigned long dirChangeZeroMs = 0;   // timestamp di quando velocita ha raggiunto 0
-bool          dirChangePaused = false; // stiamo aspettando la pausa di 2s
-#define DIR_CHANGE_PAUSE_MS  2000    // ms di pausa obbligatoria allo zero
+// ── Coast-to-stop: mantieni direzione per un po' dopo lo zero ──
+unsigned long zeroReachedMs  = 0;       // quando velocita ha raggiunto ~0
+int8_t        lastDirection  = 0;       // +1 avanti, -1 retro, 0 fermo
+#define COAST_HOLD_MS        2000       // ms prima di togliere tensione ai pin direzione
 
 // ── PID Servo stato ──
 float servo_target_angle     = SERVO_CENTER;
@@ -287,8 +286,6 @@ void loop() {
     rx_retro            = false;
     rx_pressione_pedale = 0;
     rx_speed_pct        = 10;
-    dirChangePaused     = false;
-    dirChangeZeroMs     = 0;
     lastPacketTime = 0;
     Serial.println("FAILSAFE");
   }
@@ -342,74 +339,27 @@ void loop() {
     // ═══ CALCOLO VELOCITA TARGET ═══
     float max_pwm = 255.0f * speed_pct_smooth / 100.0f;
 
-    // Flag: stiamo cambiando direzione (avanti↔retro)?
-    bool changing_direction = false;
-
     if (rx_freno) {
       // Freno attivo: target sempre 0 — ignora il gas
       velocita_target = 0;
     } else if (rx_retro) {
-      // Retromarcia richiesta
+      // Retromarcia: accettata solo se fermi o già in retro
       if (velocita_attuale > 0.5f) {
-        // Ancora in avanti: decelera verso zero
+        // Ancora in avanti: decelera dolcemente verso zero
         velocita_target = 0;
-        changing_direction = true;
-        dirChangePaused = false;
-      } else if (fabs(velocita_attuale) <= 0.5f) {
-        // Siamo (quasi) fermi: gestisci pausa obbligatoria
-        if (!dirChangePaused && dirChangeZeroMs == 0) {
-          // Prima volta allo zero durante cambio direzione
-          dirChangeZeroMs = millis();
-          dirChangePaused = true;
-          velocita_target = 0;
-        } else if (dirChangePaused) {
-          if (millis() - dirChangeZeroMs < DIR_CHANGE_PAUSE_MS) {
-            velocita_target = 0;  // ancora in pausa
-          } else {
-            // Pausa conclusa: permetti retromarcia
-            dirChangePaused = false;
-            dirChangeZeroMs = 0;
-            velocita_target = -(rx_pressione_pedale / 255.0f) * max_pwm * REVERSE_MULTIPLIER;
-          }
-        } else {
-          // Già in retro normalmente (nessun cambio in corso)
-          velocita_target = -(rx_pressione_pedale / 255.0f) * max_pwm * REVERSE_MULTIPLIER;
-        }
       } else {
-        // Già in retromarcia, nessun cambio
+        // Fermi o già in retro → permetti retromarcia
         velocita_target = -(rx_pressione_pedale / 255.0f) * max_pwm * REVERSE_MULTIPLIER;
       }
     } else {
-      // Marcia avanti richiesta
+      // Marcia avanti
       if (velocita_attuale < -0.5f) {
-        // Ancora in retro: decelera verso zero
+        // Ancora in retro: decelera dolcemente verso zero
         velocita_target = 0;
-        changing_direction = true;
-        dirChangePaused = false;
-      } else if (fabs(velocita_attuale) <= 0.5f && dirChangePaused) {
-        // Fermi con pausa attiva (tornando da retro ad avanti)
-        if (millis() - dirChangeZeroMs < DIR_CHANGE_PAUSE_MS) {
-          velocita_target = 0;
-        } else {
-          dirChangePaused = false;
-          dirChangeZeroMs = 0;
-          velocita_target = (rx_pressione_pedale / 255.0f) * max_pwm;
-        }
-      } else if (fabs(velocita_attuale) <= 0.5f && dirChangeZeroMs == 0) {
-        // Fermi, prima volta da retro→avanti
-        // Controlla se stiamo venendo dalla retro (velocita era negativa prima)
-        // Se non c'è pausa in corso, avvia direttamente
-        velocita_target = (rx_pressione_pedale / 255.0f) * max_pwm;
       } else {
-        // Già in avanti normalmente
+        // Fermi o già in avanti → permetti marcia avanti
         velocita_target = (rx_pressione_pedale / 255.0f) * max_pwm;
       }
-    }
-
-    // Reset pausa se non stiamo più cambiando direzione e siamo in moto
-    if (!changing_direction && fabs(velocita_attuale) > 1.0f) {
-      dirChangePaused = false;
-      dirChangeZeroMs = 0;
     }
 
     // ═══ RAMPA VELOCITA (freno ≫ coast ≫ accel) ═══
@@ -432,12 +382,17 @@ void loop() {
           float progress = fabs(velocita_attuale) / fmaxf(fabs(velocita_target), 1.0f);
           rate = ACCEL_RATE * (0.4f + 0.6f * progress);
           rate = fmaxf(rate, ACCEL_RATE * 0.4f);  // rate minimo
-        } else if (changing_direction) {
-          // Cambio direzione: decelerazione molto lenta
-          rate = DECEL_DIR_CHANGE;
         } else {
-          // Coast: decelerazione molto dolce
-          rate = DECEL_COAST;
+          // Decelerazione (coast / cambio direzione): easing-out vicino a zero
+          float absVel = fabs(velocita_attuale);
+          if (absVel < 30.0f) {
+            // Più lenta mano a mano che ci avviciniamo allo zero
+            float ease = absVel / 30.0f;                 // 0.0 … 1.0
+            rate = DECEL_COAST * (0.3f + 0.7f * ease);   // min 30% del rate
+            rate = fmaxf(rate, 0.15f);                    // rate minimo assoluto
+          } else {
+            rate = DECEL_COAST;
+          }
         }
         float step = fminf(fabs(diff), rate);
         velocita_attuale += copysignf(step, diff);
@@ -457,14 +412,34 @@ void loop() {
     if (velocita_attuale > 0.5f) {
       digitalWrite(DIR_FWD_PIN, HIGH);
       digitalWrite(DIR_REV_PIN, LOW);
+      lastDirection = 1;
+      zeroReachedMs = 0;
     }
     else if (velocita_attuale < -0.5f) {
       digitalWrite(DIR_FWD_PIN, LOW);
       digitalWrite(DIR_REV_PIN, HIGH);
+      lastDirection = -1;
+      zeroReachedMs = 0;
     }
     else {
-      digitalWrite(DIR_FWD_PIN, LOW);
-      digitalWrite(DIR_REV_PIN, LOW);
+      // Velocità ~0: mantieni l'ultimo pin direzione per COAST_HOLD_MS
+      if (zeroReachedMs == 0) zeroReachedMs = millis();
+
+      if (millis() - zeroReachedMs < COAST_HOLD_MS && lastDirection != 0) {
+        // Tieni ancora l'ultima direzione attiva (il motore coasta)
+        if (lastDirection > 0) {
+          digitalWrite(DIR_FWD_PIN, HIGH);
+          digitalWrite(DIR_REV_PIN, LOW);
+        } else {
+          digitalWrite(DIR_FWD_PIN, LOW);
+          digitalWrite(DIR_REV_PIN, HIGH);
+        }
+      } else {
+        // Tempo scaduto: ora puoi spegnere entrambi
+        digitalWrite(DIR_FWD_PIN, LOW);
+        digitalWrite(DIR_REV_PIN, LOW);
+        lastDirection = 0;
+      }
     }
   }
 }

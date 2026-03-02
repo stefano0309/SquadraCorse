@@ -216,6 +216,17 @@ def main():
                 accel_norm = norm_pedal(accel_raw, a_rest, a_peak)
                 freno_norm = norm_pedal(freno_raw, f_rest, f_peak)
 
+                # Sterzo: zona morta + curva esponenziale per amplificare l'errore
+                STEER_DEADZONE = 0.05          # sotto il 5% → centro esatto
+                STEER_EXPO     = 2.5           # esponente: >1 = più aggressivo fuori dalla zona morta
+                if abs(volante) < STEER_DEADZONE:
+                    volante = 0.0
+                else:
+                    sign = 1.0 if volante > 0 else -1.0
+                    # Remap [deadzone..1] → [0..1], poi curva potenza
+                    remapped = (abs(volante) - STEER_DEADZONE) / (1.0 - STEER_DEADZONE)
+                    volante = sign * (remapped ** STEER_EXPO)
+
                 # Freno: soglia 10% per attivazione
                 brake_pressed = freno_norm > 0.10
 
