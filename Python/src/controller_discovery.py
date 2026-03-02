@@ -7,7 +7,8 @@ def scopri_assi(js) -> dict:
     print(f"  Assi       : {js.get_numaxes()}")
     print("\n  --- MAPPATURA ASSI (muovi l'asse, timeout 10 s) ---\n")
     nomi = ["STERZO", "ACCELERATORE", "FRENO"]
-    assi: dict[str, int] = {}
+    assi: dict[str, dict] = {}
+    used_indices: set[int] = set()
     t0 = time.time()
     while time.time() - t0 < 0.5:
         pygame.event.pump()
@@ -21,11 +22,23 @@ def scopri_assi(js) -> dict:
         while not trovato and time.time() < deadline:
             pygame.event.pump()
             for i in range(js.get_numaxes()):
-                if abs(js.get_axis(i) - baseline[i]) > 0.25 and i not in assi.values():
-                    assi[nome] = i
-                    print(f"asse {i}  (val: {js.get_axis(i):+.2f})")
+                val = js.get_axis(i)
+                if abs(val - baseline[i]) > 0.25 and i not in used_indices:
+                    # Asse rilevato: registra riposo e continua a leggere per il picco
+                    rest = baseline[i]
+                    peak = val
+                    t_peak = time.time()
+                    while time.time() - t_peak < 0.6:
+                        pygame.event.pump()
+                        cur = js.get_axis(i)
+                        if abs(cur - rest) > abs(peak - rest):
+                            peak = cur
+                        time.sleep(0.02)
+                    assi[nome] = {"idx": i, "rest": round(rest, 3), "peak": round(peak, 3)}
+                    used_indices.add(i)
+                    print(f"asse {i}  (riposo: {rest:+.2f}, picco: {peak:+.2f})")
                     trovato = True
-                    time.sleep(0.4)
+                    time.sleep(0.2)
                     break
             time.sleep(0.02)
         if not trovato:

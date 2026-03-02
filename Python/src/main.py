@@ -15,7 +15,7 @@ SERVO_ZERO_OFFSET = config.get('SERVO_ZERO_OFFSET', 0)
 STEERING_MAX_ANGLE = config.get('STEERING_MAX_ANGLE', 90)
 WHEEL_RANGE_DEGREES = config.get('WHEEL_RANGE_DEGREES', 450)
 
-from utils import clear_once
+from utils import clear_once, get_axis_idx, get_axis_calibration, norm_pedal, norm_steer
 from mapping import load_mapping, save_mapping
 from radio_controller import RadioController
 from controller_discovery import scopri_assi, scopri_pulsanti
@@ -39,35 +39,40 @@ def main():
     mapping = load_mapping()
     need_remap = True
     if mapping and mapping.get("controller"):
-        file_ctrl = mapping.get("controller")
-        js_ctrl = js.get_name()
-        file_ctrl_norm = file_ctrl.lower().strip()
-        js_ctrl_norm = js_ctrl.lower().strip()
-        same = (file_ctrl_norm == js_ctrl_norm or file_ctrl_norm in js_ctrl_norm or js_ctrl_norm in file_ctrl_norm)
-        if same:
-            print(f"\n  Mappatura trovata per controller: {file_ctrl}")
-            print("  Premi un pulsante qualsiasi per confermare o attendi 5 s per rimappare...")
-            deadline = time.time() + 5
-            confermato = False
-            while time.time() < deadline:
-                for ev in pygame.event.get():
-                    if ev.type == pygame.JOYBUTTONDOWN:
+        # Forza rimappatura se il mapping usa il vecchio formato (int senza polarity)
+        old_format = any(isinstance(v, int) for v in mapping.get("assi", {}).values())
+        if old_format:
+            print("\n  Mappatura vecchio formato rilevata — rimappatura obbligatoria per calibrazione assi.")
+        else:
+            file_ctrl = mapping.get("controller")
+            js_ctrl = js.get_name()
+            file_ctrl_norm = file_ctrl.lower().strip()
+            js_ctrl_norm = js_ctrl.lower().strip()
+            same = (file_ctrl_norm == js_ctrl_norm or file_ctrl_norm in js_ctrl_norm or js_ctrl_norm in file_ctrl_norm)
+            if same:
+                print(f"\n  Mappatura trovata per controller: {file_ctrl}")
+                print("  Premi un pulsante qualsiasi per confermare o attendi 5 s per rimappare...")
+                deadline = time.time() + 5
+                confermato = False
+                while time.time() < deadline:
+                    for ev in pygame.event.get():
+                        if ev.type == pygame.JOYBUTTONDOWN:
+                            confermato = True
+                            break
+                    if confermato:
+                        break
+                    # anche polling sui pulsanti (nel caso non ci siano eventi)
+                    if any(js.get_button(i) for i in range(js.get_numbuttons())):
                         confermato = True
                         break
+                    time.sleep(0.02)
                 if confermato:
-                    break
-                # anche polling sui pulsanti (nel caso non ci siano eventi)
-                if any(js.get_button(i) for i in range(js.get_numbuttons())):
-                    confermato = True
-                    break
-                time.sleep(0.02)
-            if confermato:
-                need_remap = False
-                print("  Mappatura confermata.")
+                    need_remap = False
+                    print("  Mappatura confermata.")
+                else:
+                    print("  Rimappatura...")
             else:
-                print("  Rimappatura...")
-        else:
-            print(f"\n  Mappatura presente in mapping.json per '{file_ctrl}', ma controller connesso è '{js_ctrl}'. Rimappatura forzata.")
+                print(f"\n  Mappatura presente in mapping.json per '{file_ctrl}', ma controller connesso è '{js_ctrl}'. Rimappatura forzata.")
 
     if need_remap:
         assi = scopri_assi(js)
@@ -119,10 +124,13 @@ def main():
     clear_once()
     sys.stdout.write("\033[?25l")
 
+    # Indice pulsante retro per polling momentaneo
+    retro_btn_idx = pulsanti.get("RETRO")
+
     # inizializza valori assi per evitare variabili non definite nel display
     volante = 0.0
-    accel = -1.0
-    freno = -1.0
+    accel_norm = 0.0
+    freno_norm = 0.0
     steer_deg = 0.0
 
     try:
@@ -148,8 +156,7 @@ def main():
                                     speed_sel = max(0, speed_sel - 1)
                                     log_lines.append(f"Vel. max → {(speed_sel + 1) * 10}%")
                                 elif nome == "RETRO":
-                                    reverse = not reverse
-                                    log_lines.append("RETRO ON" if reverse else "RETRO OFF")
+                                    pass  # retro è momentanea, gestita sotto via polling
                                 elif nome == "MENU":
                                     cfg = run_menu(js, pulsanti, assi, rc, cfg)
                                     max_speeds = cfg.get("max_speeds", MAX_SPEEDS)
@@ -192,11 +199,29 @@ def main():
 
                 
 
-                volante = js.get_axis(assi.get("STERZO", 0))
-                accel = js.get_axis(assi.get("ACCELERATORE", 0))
-                freno = js.get_axis(assi.get("FRENO", 0))
+                # Retro momentanea: attiva solo mentre il pulsante è tenuto premuto
+                if retro_btn_idx is not None:
+                    reverse = bool(js.get_button(retro_btn_idx))
 
-                accel_norm = (accel +1) / 2
+                volante_raw = js.get_axis(get_axis_idx(assi, "STERZO"))
+                accel_raw = js.get_axis(get_axis_idx(assi, "ACCELERATORE"))
+                freno_raw = js.get_axis(get_axis_idx(assi, "FRENO"))
+
+                # Normalizzazione con calibrazione rest/peak
+                s_rest, s_peak = get_axis_calibration(assi, "STERZO")
+                a_rest, a_peak = get_axis_calibration(assi, "ACCELERATORE")
+                f_rest, f_peak = get_axis_calibration(assi, "FRENO")
+
+                volante = norm_steer(volante_raw, s_rest, s_peak)
+                accel_norm = norm_pedal(accel_raw, a_rest, a_peak)
+                freno_norm = norm_pedal(freno_raw, f_rest, f_peak)
+
+                # Freno: soglia 10% per attivazione
+                brake_pressed = freno_norm > 0.10
+
+                # Se il freno è premuto, azzera la pressione gas
+                if brake_pressed:
+                    accel_norm = 0.0
 
                 accel_byte = int(accel_norm * 255)
 
@@ -204,9 +229,9 @@ def main():
                 wheel_deg = volante * (wheel_range_degrees / 2)
                 steer_deg = max(-steering_max_angle, min(steering_max_angle, wheel_deg))
                 output_deg = steer_deg + servo_zero_offset
-                steer_byte = int(((output_deg + steering_max_angle) / (2 * steering_max_angle)) * 255)
+                # Inversione sterzo
+                steer_byte = int(((-output_deg + steering_max_angle) / (2 * steering_max_angle)) * 255)
                 steer_byte = max(0, min(255, steer_byte))
-                brake_pressed = (freno + 1.0) / 2 > 0.10
 
                 if rc.connected:
                     rc.send_data(steer_byte, accel_byte, brake_pressed, speed_sel, reverse, commands)
@@ -215,7 +240,7 @@ def main():
             if now - last_display >= DISPLAY_REFRESH_S:
                 last_display = now
                 display(rc, steer_deg, servo_zero_offset, steering_max_angle,
-                        (accel + 1) / 2, (freno + 1) / 2,
+                        accel_norm, freno_norm,
                         speed_sel, reverse, actual_rate, log_lines, max_speeds)
                 if len(log_lines) > 50:
                     log_lines = log_lines[-20:]

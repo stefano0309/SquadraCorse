@@ -2,7 +2,7 @@ import sys
 import time
 import pygame
 from radio_controller import RadioController
-from utils import save_config
+from utils import save_config, get_axis_idx
 
 # ══════════════ MENU IMPOSTAZIONI ══════════════
 MENU_ITEMS = [
@@ -100,7 +100,7 @@ def display_calibration(offset: float, volante_deg: float, steering_max: float):
 
 def run_servo_calibration(js, assi: dict, pulsanti: dict, rc: RadioController, cfg: dict) -> float:
     """Interactive servo zero calibration. Returns the new offset (degrees)."""
-    sterzo_idx = assi.get("STERZO", 0)
+    sterzo_idx = get_axis_idx(assi, "STERZO")
     wheel_range = cfg.get("WHEEL_RANGE_DEGREES", 450)
     steering_max = cfg.get("STEERING_MAX_ANGLE", 90)
     offset = cfg.get("SERVO_ZERO_OFFSET", 0)
