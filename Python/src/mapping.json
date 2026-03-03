@@ -1,26 +1,26 @@
 {
-  "controller": "Thrustmaster Racing Wheel FFB",
+  "controller": "(Wireless Controller for PS4)",
   "assi": {
     "STERZO": {
       "idx": 0,
-      "rest": -0.013,
-      "peak": 0.283
+      "rest": 0.0,
+      "peak": 1.0
     },
     "ACCELERATORE": {
       "idx": 5,
-      "rest": 1.0,
-      "peak": -1.0
+      "rest": -1.0,
+      "peak": 1.0
     },
     "FRENO": {
-      "idx": 1,
-      "rest": 1.0,
-      "peak": -1.0
+      "idx": 4,
+      "rest": -1.0,
+      "peak": 1.0
     }
   },
   "pulsanti": {
-    "VEL_SU": 1,
+    "VEL_SU": 3,
     "VEL_GIU": 0,
-    "RETRO": 9,
+    "RETRO": 1,
     "MENU": 7
   }
 }

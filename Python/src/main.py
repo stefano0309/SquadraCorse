@@ -25,13 +25,19 @@ from menu import run_menu
 from pygame_init import init_pygame
 
 # ══════════════ MAIN ══════════════
+_quit_flag = False
+
+def _sigint_handler(signum, frame):
+    global _quit_flag
+    _quit_flag = True
+
 def main():
     parser = argparse.ArgumentParser(description="TX Squadra Corse – solo terminale")
     parser.add_argument("port", nargs="?", default="/dev/ttyUSB0" if sys.platform != "win32" else "COM9")
     args = parser.parse_args()
 
     init_pygame()
-    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    signal.signal(signal.SIGINT, _sigint_handler)
     if pygame.joystick.get_count() == 0:
         print("  Nessun controller trovato!")
         return
@@ -136,7 +142,7 @@ def main():
     steer_deg = 0.0
 
     try:
-        while True:
+        while not _quit_flag:
             pygame.event.pump()
 
             # Pulsanti: registra DOWN e attiva azione al rilascio (durata minima)
