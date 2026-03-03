@@ -1,6 +1,7 @@
 import pygame
 import time
 import sys
+import signal
 import argparse
 import json
 import pathlib
@@ -30,6 +31,7 @@ def main():
     args = parser.parse_args()
 
     init_pygame()
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
     if pygame.joystick.get_count() == 0:
         print("  Nessun controller trovato!")
         return
