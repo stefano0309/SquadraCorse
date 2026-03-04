@@ -1,2 +1,2 @@
-pygame>=2.0.0
-pyserial>=3.0
+pygame-ce
+pyserial
