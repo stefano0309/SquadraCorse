@@ -52,8 +52,10 @@ python main.py
 
 ## 5. Eseguibile ambiente 
 
+Assicurarsi di avere il file setup_corse.sh copiato nella directory precedente rispetto a SquadraCorse
+
 ```BASH
-chmod +x setup_corse.
+chmod +x setup_corse.sh
 ```
 
 ```BASH
