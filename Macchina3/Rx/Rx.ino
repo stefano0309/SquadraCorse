@@ -71,7 +71,7 @@ const int SERVO_CENTER = 90;
 // ── Rampe motore (unità PWM per tick di UPDATE_INTERVAL_MS) ──
 #define ACCEL_RATE          2.5f
 #define DECEL_COAST         1.2f
-#define DECEL_BRAKE         4.0f
+#define DECEL_BRAKE        16.0f
 
 // ── Rampa cambio marcia (% per tick) ──
 #define SPEED_PCT_RATE      1.5f

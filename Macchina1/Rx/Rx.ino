@@ -50,7 +50,7 @@ const int SERVO_CENTER = 90;
 #define PWM_RES          8      // 8 bit → 0-255
 
 // ============== CONFIGURAZIONE ==============
-#define STEER_ANGLE_MAX     45
+#define STEER_ANGLE_MAX     70
 #define REVERSE_MULTIPLIER   0.5f
 #define DEADZONE             0.08f
 #define FAILSAFE_MS          500
@@ -71,7 +71,7 @@ const int SERVO_CENTER = 90;
 // ── Rampe motore (unità PWM per tick di UPDATE_INTERVAL_MS) ──
 #define ACCEL_RATE          2.5f   // accelerazione verso target (~2s per 0→max)
 #define DECEL_COAST         1.2f   // rilascio acceleratore – coast molto dolce (~4s)
-#define DECEL_BRAKE         4.0f   // frenata attiva – graduale (~1.3s)
+#define DECEL_BRAKE        16.0f   // frenata attiva – quasi istantanea (~0.3s)
 
 // ── Rampa cambio marcia (% per tick) ──
 #define SPEED_PCT_RATE      1.5f   // quanto veloce cambia speed_pct_smooth (~1.3s per 0→100%)

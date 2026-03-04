@@ -132,6 +132,30 @@ def main():
     clear_once()
     sys.stdout.write("\033[?25l")
 
+    # Tastiera non-bloccante per ESC
+    if sys.platform == "win32":
+        import msvcrt
+    else:
+        import select as _sel
+
+    def _check_esc() -> bool:
+        """Return True if ESC was pressed on the keyboard."""
+        if sys.platform == "win32":
+            while msvcrt.kbhit():
+                ch = msvcrt.getch()
+                if ch in (b'\xe0', b'\x00'):
+                    msvcrt.getch()          # consume second byte of special key
+                    continue
+                if ch == b'\x1b':           # ESC
+                    return True
+            return False
+        else:
+            if _sel.select([sys.stdin], [], [], 0)[0]:
+                ch = sys.stdin.read(1)
+                if ch == '\x1b':
+                    return True
+            return False
+
     # Indice pulsante retro per polling momentaneo
     retro_btn_idx = pulsanti.get("RETRO")
 
@@ -143,6 +167,10 @@ def main():
 
     try:
         while not _quit_flag:
+            # ── ESC da tastiera → chiudi ──
+            if _check_esc():
+                break
+
             pygame.event.pump()
 
             # Pulsanti: registra DOWN e attiva azione al rilascio (durata minima)
@@ -168,6 +196,9 @@ def main():
                                     log_lines.append(f"Retro {'ON' if reverse else 'OFF'}")
                                 elif nome == "MENU":
                                     cfg = run_menu(js, pulsanti, assi, rc, cfg)
+                                    if cfg.pop("_quit", False):
+                                        _quit_flag = True
+                                        break
                                     max_speeds = cfg.get("max_speeds", MAX_SPEEDS)
                                     speed_sel = min(speed_sel, max_speeds - 1)
                                     intervallo = 1.0 / max(1, rc.send_rate)

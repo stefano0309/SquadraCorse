@@ -15,6 +15,7 @@ MENU_ITEMS = [
     {"label": "Porta Seriale",      "key": "serial_port", "type": "info"},
     {"label": "Rimappa Controller", "key": "remap",       "type": "action"},
     {"label": "Refresh Status TX",  "key": "refresh",     "type": "action"},
+    {"label": "Chiudi Programma",   "key": "quit",        "type": "action"},
     {"label": "Esci dal menu",      "key": "exit",        "type": "action"},
 ]
 
@@ -439,6 +440,9 @@ def run_menu(js, pulsanti: dict, assi: dict, rc: RadioController, cfg: dict) -> 
                         break
                     elif item["key"] == "refresh" and rc.connected:
                         rc.refresh_status()
+                    elif item["key"] == "quit":
+                        cfg["_quit"] = True
+                        break
                     elif item["key"] == "exit":
                         break
                 display_menu(cursor, rc, cfg, editing)
