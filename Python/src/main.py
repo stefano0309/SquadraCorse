@@ -164,7 +164,8 @@ def main():
                                     speed_sel = max(0, speed_sel - 1)
                                     log_lines.append(f"Vel. max → {(speed_sel + 1) * 10}%")
                                 elif nome == "RETRO":
-                                    pass  # retro è momentanea, gestita sotto via polling
+                                    reverse = not reverse
+                                    log_lines.append(f"Retro {'ON' if reverse else 'OFF'}")
                                 elif nome == "MENU":
                                     cfg = run_menu(js, pulsanti, assi, rc, cfg)
                                     max_speeds = cfg.get("max_speeds", MAX_SPEEDS)
@@ -206,10 +207,6 @@ def main():
 
 
                 
-
-                # Retro momentanea: attiva solo mentre il pulsante è tenuto premuto
-                if retro_btn_idx is not None:
-                    reverse = bool(js.get_button(retro_btn_idx))
 
                 volante_raw = js.get_axis(get_axis_idx(assi, "STERZO"))
                 accel_raw = js.get_axis(get_axis_idx(assi, "ACCELERATORE"))

@@ -1,8 +1,8 @@
 /*
- * RxCompleto.ino — Ricezione Squadra Corse
+ * Rx.ino — Ricezione Squadra Corse – Macchina 3
  *
  * Pacchetto radio 9 byte:
- *   [0-3] Token "VAL1"
+ *   [0-3] Token "VAL3"
  *   [4]   Sterzo        (0-255, 128 = centro)
  *   [5]   Accelerazione (0-255)
  *   [6]   speed_sel:4 | brake:1 | reverse:1 | comandi:2
@@ -57,17 +57,24 @@ const int SERVO_CENTER = 90;
 #define PROBE_INTERVAL_MS   2000        // ms tra un probe e l'altro
 #define PACKET_SIZE           9
 #define UPDATE_INTERVAL_MS    20        // aggiornamento motore/servo (50 Hz)
+#define NRF_CHANNEL          93         // Canale NRF24 – Macchina 3
+
+// ── Token identificativo macchina ──
+#define TOKEN_0 'V'
+#define TOKEN_1 'A'
+#define TOKEN_2 'L'
+#define TOKEN_3 '3'
 
 // ── Velocità percentuale (10 livelli: 10%..100%) ──
 #define SPEED_LEVELS         10
 
 // ── Rampe motore (unità PWM per tick di UPDATE_INTERVAL_MS) ──
-#define ACCEL_RATE          2.5f   // accelerazione verso target (~2s per 0→max)
-#define DECEL_COAST         1.2f   // rilascio acceleratore – coast molto dolce (~4s)
-#define DECEL_BRAKE         4.0f   // frenata attiva – graduale (~1.3s)
+#define ACCEL_RATE          2.5f
+#define DECEL_COAST         1.2f
+#define DECEL_BRAKE         4.0f
 
 // ── Rampa cambio marcia (% per tick) ──
-#define SPEED_PCT_RATE      1.5f   // quanto veloce cambia speed_pct_smooth (~1.3s per 0→100%)
+#define SPEED_PCT_RATE      1.5f
 
 // ── Soglia minima PWM per vincere l'attrito statico ──
 #define MOTOR_MIN_PWM       25
@@ -76,7 +83,7 @@ const int SERVO_CENTER = 90;
 #define SERVO_KP           0.35f
 #define SERVO_KI           0.008f
 #define SERVO_KD           0.20f
-#define SERVO_I_MAX       30.0f   // anti-windup
+#define SERVO_I_MAX       30.0f
 
 Servo servo;
 
@@ -92,15 +99,15 @@ unsigned long lastVelocityUpdate  = 0;
 bool    rx_freno             = false;
 bool    rx_retro             = false;
 uint8_t rx_pressione_pedale  = 0;
-uint8_t rx_speed_pct         = 10;     // percentuale velocità max (10-100)
-float   speed_pct_smooth     = 10.0f;  // versione interpolata di rx_speed_pct
+uint8_t rx_speed_pct         = 10;
+float   speed_pct_smooth     = 10.0f;
 float   velocita_target      = 0;
 float   velocita_attuale     = 0;
 
-// ── Coast-to-stop: mantieni direzione per un po' dopo lo zero ──
-unsigned long zeroReachedMs  = 0;       // quando velocita ha raggiunto ~0
-int8_t        lastDirection  = 0;       // +1 avanti, -1 retro, 0 fermo
-#define COAST_HOLD_MS        2000       // ms prima di togliere tensione ai pin direzione
+// ── Coast-to-stop ──
+unsigned long zeroReachedMs  = 0;
+int8_t        lastDirection  = 0;
+#define COAST_HOLD_MS        2000
 
 // ── PID Servo stato ──
 float servo_target_angle     = SERVO_CENTER;
@@ -137,7 +144,7 @@ bool initNRF24() {
   SPI.begin();
   SPI.setClockDivider(SPI_CLOCK_DIV16);
   if (!radio.begin()) return false;
-  radio.setChannel(73);
+  radio.setChannel(NRF_CHANNEL);
   radio.setPALevel(RF24_PA_MAX);
   radio.setDataRate(RF24_250KBPS);
   radio.setPayloadSize(PACKET_SIZE);
@@ -184,7 +191,7 @@ void probeRadio() {
 
 // ========== ELABORAZIONE PACCHETTO ==========
 void processPacket(const uint8_t *buf, int rssi) {
-  if (buf[0] != 'V' || buf[1] != 'A' || buf[2] != 'L' || buf[3] != '1') {
+  if (buf[0] != TOKEN_0 || buf[1] != TOKEN_1 || buf[2] != TOKEN_2 || buf[3] != TOKEN_3) {
     Serial.println("TOKEN_ERR");
     return;
   }
@@ -207,20 +214,16 @@ void processPacket(const uint8_t *buf, int rssi) {
   bool    reverse   = (miscByte >> 2) & 0x01;
   uint8_t commands  = miscByte & 0x03;
 
-  // ── Sterzo → target PID servo ──
   float steerNorm = ((float)steerByte - 128.0f) / 127.0f;
   steerNorm = constrain(steerNorm, -1.0f, 1.0f);
   if (fabs(steerNorm) < DEADZONE) steerNorm = 0.0f;
   servo_target_angle = SERVO_CENTER + steerNorm * STEER_ANGLE_MAX;
 
-  // ── Aggiorna stato motore ──
   rx_freno            = brake;
   rx_retro            = reverse;
   rx_pressione_pedale = accelByte;
-  // speed_sel 0-9 → 10%..100%  (valori >9 clampati a 100%)
   rx_speed_pct        = min((int)(speedSel + 1) * 10, 100);
 
-  // ── Output seriale ──
   Serial.print("S:");   Serial.print(steerNorm, 2);
   Serial.print(" A:");  Serial.print((float)accelByte / 255.0f, 2);
   Serial.print(" B:");  Serial.print(brake ? "Y" : "N");
@@ -242,7 +245,6 @@ void setup() {
   servo.attach(SERVO_PIN, 500, 2400);
   servo.write(SERVO_CENTER);
 
-  // Motore
   ledcAttach(PWM_PIN, PWM_FREQ, PWM_RES);
   pinMode(DIR_FWD_PIN, OUTPUT);
   pinMode(DIR_REV_PIN, OUTPUT);
@@ -253,7 +255,6 @@ void setup() {
 
   if (activeRadio == RADIO_NONE) {
     Serial.println("ERR NO_RADIO");
-    // Non blocchiamo: il probe periodico ritenterà
   } else {
     Serial.print("RX READY ");
     Serial.println(radioName());
@@ -262,14 +263,12 @@ void setup() {
 
 // ======================== LOOP =========================
 void loop() {
-  // ── Probe periodico ──
   unsigned long now = millis();
   if (now - lastProbeMs >= PROBE_INTERVAL_MS) {
     lastProbeMs = now;
     probeRadio();
   }
 
-  // ── Failsafe ──
   if (lastPacketTime > 0 && (millis() - lastPacketTime > FAILSAFE_MS)) {
     servo.write(SERVO_CENTER);
     servo_current_angle = SERVO_CENTER;
@@ -290,7 +289,6 @@ void loop() {
     Serial.println("FAILSAFE");
   }
 
-  // ── Ricezione pacchetto ──
   uint8_t buf[PACKET_SIZE] = {0};
 
   if (activeRadio == RADIO_LORA) {
@@ -307,11 +305,9 @@ void loop() {
     }
   }
 
-  // ── Aggiornamento motore + servo PID (ogni UPDATE_INTERVAL_MS) ──
   if (millis() - lastVelocityUpdate >= UPDATE_INTERVAL_MS) {
     lastVelocityUpdate = millis();
 
-    // ═══ PID SERVO ═══
     float servoErr  = servo_target_angle - servo_current_angle;
     servo_integral += servoErr;
     servo_integral  = constrain(servo_integral, -SERVO_I_MAX, SERVO_I_MAX);
@@ -327,7 +323,6 @@ void loop() {
                                      (float)(SERVO_CENTER + STEER_ANGLE_MAX));
     servo.write((int)(servo_current_angle + 0.5f));
 
-    // ═══ INTERPOLAZIONE MARCIA (speed_pct) ═══
     float pctTarget = (float)rx_speed_pct;
     float pctDiff   = pctTarget - speed_pct_smooth;
     if (fabs(pctDiff) < SPEED_PCT_RATE) {
@@ -336,35 +331,25 @@ void loop() {
       speed_pct_smooth += copysignf(SPEED_PCT_RATE, pctDiff);
     }
 
-    // ═══ CALCOLO VELOCITA TARGET ═══
     float max_pwm = 255.0f * speed_pct_smooth / 100.0f;
 
     if (rx_freno) {
-      // Freno attivo: target sempre 0 — ignora il gas
       velocita_target = 0;
     } else if (rx_retro) {
-      // Retromarcia: accettata solo se fermi o già in retro
       if (velocita_attuale > 0.5f) {
-        // Ancora in avanti: decelera dolcemente verso zero
         velocita_target = 0;
       } else {
-        // Fermi o già in retro → permetti retromarcia
         velocita_target = -(rx_pressione_pedale / 255.0f) * max_pwm * REVERSE_MULTIPLIER;
       }
     } else {
-      // Marcia avanti
       if (velocita_attuale < -0.5f) {
-        // Ancora in retro: decelera dolcemente verso zero
         velocita_target = 0;
       } else {
-        // Fermi o già in avanti → permetti marcia avanti
         velocita_target = (rx_pressione_pedale / 255.0f) * max_pwm;
       }
     }
 
-    // ═══ RAMPA VELOCITA (freno ≫ coast ≫ accel) ═══
     if (rx_freno) {
-      // Frenata attiva: decelerazione rapida ma graduale verso 0
       if (fabs(velocita_attuale) <= DECEL_BRAKE) {
         velocita_attuale = 0;
       } else {
@@ -378,18 +363,15 @@ void loop() {
         bool accelerating = (fabs(velocita_target) >= fabs(velocita_attuale));
         float rate;
         if (accelerating) {
-          // Easing in: più lenta all'inizio, poi cresce
           float progress = fabs(velocita_attuale) / fmaxf(fabs(velocita_target), 1.0f);
           rate = ACCEL_RATE * (0.4f + 0.6f * progress);
-          rate = fmaxf(rate, ACCEL_RATE * 0.4f);  // rate minimo
+          rate = fmaxf(rate, ACCEL_RATE * 0.4f);
         } else {
-          // Decelerazione (coast / cambio direzione): easing-out vicino a zero
           float absVel = fabs(velocita_attuale);
           if (absVel < 30.0f) {
-            // Più lenta mano a mano che ci avviciniamo allo zero
-            float ease = absVel / 30.0f;                 // 0.0 … 1.0
-            rate = DECEL_COAST * (0.3f + 0.7f * ease);   // min 30% del rate
-            rate = fmaxf(rate, 0.15f);                    // rate minimo assoluto
+            float ease = absVel / 30.0f;
+            rate = DECEL_COAST * (0.3f + 0.7f * ease);
+            rate = fmaxf(rate, 0.15f);
           } else {
             rate = DECEL_COAST;
           }
@@ -397,14 +379,11 @@ void loop() {
         float step = fminf(fabs(diff), rate);
         velocita_attuale += copysignf(step, diff);
       }
-      // Protezione anti-inversione: il coast non deve attraversare lo zero
       if (!rx_retro && velocita_attuale < 0) velocita_attuale = 0;
       if (rx_retro  && velocita_attuale > 0) velocita_attuale = 0;
     }
 
-    // ═══ OUTPUT MOTORE ═══
     int pwmVal = (int)(fabs(velocita_attuale) + 0.5f);
-    // Soglia minima PWM per vincere l'inerzia statica
     if (pwmVal > 0 && pwmVal < MOTOR_MIN_PWM) pwmVal = MOTOR_MIN_PWM;
     pwmVal = constrain(pwmVal, 0, 255);
     ledcWrite(PWM_PIN, pwmVal);
@@ -422,11 +401,9 @@ void loop() {
       zeroReachedMs = 0;
     }
     else {
-      // Velocità ~0: mantieni l'ultimo pin direzione per COAST_HOLD_MS
       if (zeroReachedMs == 0) zeroReachedMs = millis();
 
       if (millis() - zeroReachedMs < COAST_HOLD_MS && lastDirection != 0) {
-        // Tieni ancora l'ultima direzione attiva (il motore coasta)
         if (lastDirection > 0) {
           digitalWrite(DIR_FWD_PIN, HIGH);
           digitalWrite(DIR_REV_PIN, LOW);
@@ -435,7 +412,6 @@ void loop() {
           digitalWrite(DIR_REV_PIN, HIGH);
         }
       } else {
-        // Tempo scaduto: ora puoi spegnere entrambi
         digitalWrite(DIR_FWD_PIN, LOW);
         digitalWrite(DIR_REV_PIN, LOW);
         lastDirection = 0;

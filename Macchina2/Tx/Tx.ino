@@ -1,8 +1,8 @@
 /*
- * TxCompleto.ino — Trasmissione Squadra Corse
+ * Tx.ino — Trasmissione Squadra Corse – Macchina 2
  *
  * Pacchetto radio 9 byte:
- *   [0-3] Token "VAL1"
+ *   [0-3] Token "VAL2"
  *   [4]   Sterzo       (0-255, 128 = centro)
  *   [5]   Accelerazione(0-255)
  *   [6]   speed_sel:4 | brake:1 | reverse:1 | comandi:2
@@ -45,6 +45,13 @@ const byte nrfAddress[6] = "00001";
 #define USB_FRAME_SIZE      6
 #define BINARY_MARKER    0xAA
 #define PROBE_INTERVAL_MS 2000          // ogni 2 s controlla se il modulo è cambiato
+#define NRF_CHANNEL        83           // Canale NRF24 – Macchina 2
+
+// ── Token identificativo macchina ──
+#define TOKEN_0 'V'
+#define TOKEN_1 'A'
+#define TOKEN_2 'L'
+#define TOKEN_3 '2'
 
 int  loraTxPower  = 20;                 // dBm  (2 – 20)
 int  sendRate     = 20;                 // Hz
@@ -84,7 +91,7 @@ bool initNRF24() {
   SPI.begin();
   SPI.setClockDivider(SPI_CLOCK_DIV16);
   if (!radio.begin()) return false;
-  radio.setChannel(73);
+  radio.setChannel(NRF_CHANNEL);
   radio.setPALevel(RF24_PA_MAX);
   radio.setDataRate(RF24_250KBPS);
   radio.setPayloadSize(PACKET_SIZE);
@@ -102,37 +109,31 @@ const char *radioName() {
 }
 
 // ========== DETECT / PROBE ==========
-// Prova a trovare un modulo. Restituisce il tipo trovato.
 RadioType detectRadio() {
   if (initLoRa())  return RADIO_LORA;
   if (initNRF24()) return RADIO_NRF24;
   return RADIO_NONE;
 }
 
-// Chiamata periodica: controlla se il modulo HW è cambiato.
 void probeRadio() {
   RadioType prev = activeRadio;
 
-  // Prima controlla se il modulo attuale è ancora presente
   bool stillAlive = false;
   if (prev == RADIO_LORA) {
-    // LoRa: prova a ri-inizializzare
     stillAlive = initLoRa();
   } else if (prev == RADIO_NRF24) {
     stillAlive = initNRF24();
   }
 
   if (stillAlive) {
-    activeRadio = prev;  // tutto OK, modulo invariato
+    activeRadio = prev;
     return;
   }
 
-  // Modulo precedente non risponde: prova l'altro
   RadioType found = detectRadio();
   activeRadio = found;
 
   if (found != prev) {
-    // Segnala il cambio via USB
     Serial.print("MODULE_CHANGED ");
     Serial.print(radioName());
     if (found == RADIO_LORA) {
@@ -146,7 +147,7 @@ void probeRadio() {
 // ========== COSTRUZIONE + TRASMISSIONE ==========
 bool transmitPacket(const uint8_t *payload3) {
   uint8_t pkt[PACKET_SIZE];
-  pkt[0] = 'V'; pkt[1] = 'A'; pkt[2] = 'L'; pkt[3] = '1';
+  pkt[0] = TOKEN_0; pkt[1] = TOKEN_1; pkt[2] = TOKEN_2; pkt[3] = TOKEN_3;
   memcpy(pkt + 4, payload3, 3);
   uint16_t crc = crc16_ccitt(pkt, 7);
   pkt[7] = (crc >> 8) & 0xFF;
@@ -230,19 +231,16 @@ void setup() {
 
 // ======================== LOOP =========================
 void loop() {
-  // ── Probe periodico modulo HW ──
   unsigned long now = millis();
   if (now - lastProbeMs >= PROBE_INTERVAL_MS) {
     lastProbeMs = now;
     probeRadio();
   }
 
-  // ── Seriale USB ──
   if (Serial.available() == 0) { delay(1); return; }
 
   uint8_t first = Serial.peek();
 
-  // ---------- frame binario ----------
   if (first == BINARY_MARKER) {
     if (Serial.available() < USB_FRAME_SIZE) { delay(1); return; }
 
@@ -266,7 +264,6 @@ void loop() {
     bool ok = transmitPacket(frame + 1);
     if (!ok) Serial.println("TX_FAIL");
   }
-  // ---------- comando testo ----------
   else {
     String cmd = Serial.readStringUntil('\n');
     handleCommand(cmd);
