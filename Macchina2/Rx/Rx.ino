@@ -50,7 +50,7 @@ const int SERVO_CENTER = 90;
 #define PWM_RES          8      // 8 bit → 0-255
 
 // ============== CONFIGURAZIONE ==============
-#define STEER_ANGLE_MAX     45
+#define STEER_ANGLE_MAX     70
 #define REVERSE_MULTIPLIER   0.5f
 #define DEADZONE             0.08f
 #define FAILSAFE_MS          500
