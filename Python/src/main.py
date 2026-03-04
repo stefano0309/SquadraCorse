@@ -32,6 +32,7 @@ def _sigint_handler(signum, frame):
     _quit_flag = True
 
 def main():
+    global _quit_flag
     parser = argparse.ArgumentParser(description="TX Squadra Corse – solo terminale")
     parser.add_argument("port", nargs="?", default="/dev/ttyUSB0" if sys.platform != "win32" else "COM9")
     args = parser.parse_args()
@@ -88,6 +89,20 @@ def main():
         mapping = {"controller": js.get_name(), "assi": assi, "pulsanti": pulsanti}
         save_mapping(mapping)
         print("  Mappatura salvata in mapping.json")
+
+    # ── Pulizia post-mappatura ──
+    # Attendi che tutti i pulsanti siano rilasciati
+    t0 = time.time()
+    while time.time() - t0 < 1.0:
+        pygame.event.pump()
+        if not any(js.get_button(i) for i in range(js.get_numbuttons())):
+            break
+        time.sleep(0.02)
+    # Svuota la coda eventi e resetta il flag quit (potrebbe essere stato alterato durante la mappatura)
+    pygame.event.clear()
+    time.sleep(0.2)
+    pygame.event.clear()
+    _quit_flag = False
 
     assi = mapping["assi"]
     pulsanti = mapping["pulsanti"]
