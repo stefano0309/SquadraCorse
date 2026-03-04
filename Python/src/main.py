@@ -132,40 +132,6 @@ def main():
     clear_once()
     sys.stdout.write("\033[?25l")
 
-    # Tastiera non-bloccante per ESC
-    _linux_old_settings = None
-    if sys.platform == "win32":
-        import msvcrt
-    else:
-        import select as _sel
-        import tty, termios
-        _linux_old_settings = termios.tcgetattr(sys.stdin)
-        tty.setcbreak(sys.stdin.fileno())
-        # Flush dati residui nello stdin (evita trigger spurio all'avvio)
-        while _sel.select([sys.stdin], [], [], 0)[0]:
-            sys.stdin.read(1)
-
-    def _check_esc() -> bool:
-        """Return True if ESC was pressed on the keyboard."""
-        if sys.platform == "win32":
-            while msvcrt.kbhit():
-                ch = msvcrt.getch()
-                if ch in (b'\xe0', b'\x00'):
-                    msvcrt.getch()          # consume second byte of special key
-                    continue
-                if ch == b'\x1b':           # ESC
-                    return True
-            return False
-        else:
-            if _sel.select([sys.stdin], [], [], 0)[0]:
-                ch = sys.stdin.read(1)
-                if ch == '\x1b':
-                    # Consuma il resto della sequenza escape (frecce ecc.)
-                    while _sel.select([sys.stdin], [], [], 0.02)[0]:
-                        sys.stdin.read(1)
-                    return True
-            return False
-
     # Indice pulsante retro per polling momentaneo
     retro_btn_idx = pulsanti.get("RETRO")
 
@@ -177,10 +143,6 @@ def main():
 
     try:
         while not _quit_flag:
-            # ── ESC da tastiera → chiudi ──
-            if _check_esc():
-                break
-
             pygame.event.pump()
 
             # Pulsanti: registra DOWN e attiva azione al rilascio (durata minima)
@@ -307,9 +269,6 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
-        if _linux_old_settings is not None:
-            import termios as _termios_restore
-            _termios_restore.tcsetattr(sys.stdin, _termios_restore.TCSADRAIN, _linux_old_settings)
         sys.stdout.write("\033[?25h")
         print("\n\n  Chiusura …")
         rc.close()

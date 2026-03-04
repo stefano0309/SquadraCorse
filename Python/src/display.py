@@ -32,6 +32,6 @@ def display(rc: RadioController, steer_deg: float, servo_offset: float, steering
     ]
     for i in range(4):
         lines.append(pad(f"  >> {tail[i]}") if i < len(tail) else pad(""))
-    lines.extend([sep, pad("  [MENU] per impostazioni  |  ESC per uscire")])
+    lines.extend([sep, pad("  [MENU] per impostazioni")])
     sys.stdout.write("\n".join(lines) + "\n")
     sys.stdout.flush()
