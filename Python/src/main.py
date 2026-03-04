@@ -240,7 +240,7 @@ def main():
                 freno_norm = norm_pedal(freno_raw, f_rest, f_peak)
 
                 # Sterzo: zona morta + curva esponenziale per amplificare l'errore
-                STEER_DEADZONE = 0.05          # sotto il 5% → centro esatto
+                STEER_DEADZONE = 0.01          # sotto l'1% → centro esatto
                 STEER_EXPO     = 2.5           # esponente: >1 = più aggressivo fuori dalla zona morta
                 if abs(volante) < STEER_DEADZONE:
                     volante = 0.0
