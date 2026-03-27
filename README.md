@@ -1,61 +1,46 @@
-# 🏎️ SquadraCorse
+Il progetto è attualmente suddiviso in tre macrocategorie:
 
-## 🎯 Obiettivo
-Creare una console app che permetta la visualizzazione dei comandi e delle impostazioni di comunicazione di un sistema remoto.
-L’interfaccia consente di controllare una macchina radiocomandata (sviluppata negli anni precedenti) tramite un volante o un controller connesso via cavo al computer. La comunicazione tra il computer e la macchina avviene tramite segnali radio.
+**1. Codice Python (PC / Raspberry Pi)**  
+Si occupa di:
 
-## 🧩 Descrizione del progetto
-Il progetto è sviluppato grazie al utilizzo di Python che permette di leggere gli input del volante 
+- Mappare, riconoscere e normalizzare i comandi provenienti da controller o volante.
+- Stabilire la comunicazione seriale con il trasmettitore.
+- Avviare una fase di _handshake_ durante la quale:
+    - viene comunicato quale modulo radio è in uso (2.4 GHz oppure 433 MHz);
+    - viene definita la frequenza di invio dei pacchetti (pacchetti al secondo);
+    - nel caso del 433 MHz, viene impostata anche la potenza di trasmissione.
 
+Il software legge continuamente gli input e li converte in un comando compatto da inviare via seriale al trasmettitore. Il pacchetto è strutturato nel seguente modo:
 
-## 🛠️ Tecnologie utilizzate
--Python
+- 1 byte per lo sterzo
+- 1 byte per l’accelerazione
+- 1 byte per il freno
+- 1 bit per la retromarcia
+- 3 bit riservati per implementazioni future
+- 4 bit per la selezione della velocità (valore compreso tra 1 e 16; il numero effettivo di velocità può essere modificato)
+- 2 byte di CRC (Cyclic Redundancy Check), indispensabili per rilevare eventuali errori dovuti a interferenze o rumore, che potrebbero compromettere il funzionamento del motore o danneggiare componenti meccaniche.
 
-## ⚙️ Dettagli tecnici
-La comunicazione avviene tra:
+---
 
-- Il raspberryPi5 che gestisce l'applicativo console e la comunicazione in invio per i comandi e in ricezione per la telemetria
-- ES32 ricezione dei dati inviati dal raspberry ed invio della telemetria
+**2. Codice C per il Trasmettitore**
 
-## Utilizzo
+Il firmware del trasmettitore:
 
-1. Creare un ambiente virtuale
-Dalla root della repository (SquadraCorse/):
+- Riceve i comandi dal PC o dal Raspberry Pi tramite seriale.
+- Verifica l’integrità del pacchetto controllando la CRC.
+- Aggiunge 4 byte di token identificativo (VAL1) all’inizio del comando.
+- Trasmette il pacchetto tramite il modulo radio collegato.
 
-Linux / macOS
-python3 -m venv .venv
+Il modulo radio può essere cambiato in qualsiasi momento (2.4 GHz o 433 MHz) senza necessità di riavviare le schede (hot swap).
 
-Windows
-python -m venv .venv
+---
 
+**3. Codice C per il Ricevitore**
 
-2. Attivare l’ambiente virtuale
+Il firmware del ricevitore:
 
-Linux / macOS
-source .venv/bin/activate
-
-Windows (PowerShell)
-.venv\Scripts\activate
-
-
-Dopo l’attivazione, vedrai il prompt modificato così:
-
-(.venv) $
-
-
-3. Installare le dipendenze
-
-pip install -r requirements.txt
-
-
-4. Eseguire il programma
-⚠️ Da root della repo, non entrare in src/:
-
-python -m src.main
-
-
-Questo comando avvia il programma e permette a Python di trovare correttamente i moduli.
-
-5. Uscire dal programma
-
-Chiudi la finestra o premi ESC / pulsanti previsti nel menu.
+- Riceve i pacchetti tramite il modulo radio collegato.
+- Verifica che il token di identificazione corrisponda.
+- Controlla la validità dei dati tramite CRC.
+- Se il pacchetto è valido, esegue il comando: sterzo, accelerazione, freno e retromarcia.
+- La gestione della velocità impostata è ancora da implementare.

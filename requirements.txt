@@ -1,4 +1,0 @@
-colorama
-pygame-ce
-pyserial
-art

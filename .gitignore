@@ -1,10 +1,1 @@
-__pycache__/
-*.pyc
-.venv/
-.env
-dist/
-build/
-*.log
-data/
-note.md
-sender.py
+**/__pycache__/**

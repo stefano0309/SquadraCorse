@@ -1,0 +1,26 @@
+{
+  "controller": "(Wireless Controller for PS4)",
+  "assi": {
+    "STERZO": {
+      "idx": 0,
+      "rest": 0.0,
+      "peak": 1.0
+    },
+    "ACCELERATORE": {
+      "idx": 5,
+      "rest": -1.0,
+      "peak": 1.0
+    },
+    "FRENO": {
+      "idx": 4,
+      "rest": -1.0,
+      "peak": 1.0
+    }
+  },
+  "pulsanti": {
+    "VEL_SU": 3,
+    "VEL_GIU": 0,
+    "RETRO": 1,
+    "MENU": 7
+  }
+}
