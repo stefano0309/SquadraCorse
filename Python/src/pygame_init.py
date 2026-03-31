@@ -6,6 +6,7 @@ import pygame
 def init_pygame():
     os.environ["SDL_AUDIODRIVER"] = "dummy"
     os.environ["SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS"] = "1"
+    # Se OS = Windows configurazione strana incomprensibile
     if sys.platform == "win32":
         os.environ["SDL_VIDEO_WINDOW_POS"] = "-32000,-32000"
         pygame.init()
@@ -17,6 +18,8 @@ def init_pygame():
             ctypes.windll.user32.SetWindowLongW(hwnd, -20, style | 0x00000080)
         except Exception:
             pass
+
+    # Altrimenti configurazione bella e simpatica
     else:
         os.environ["SDL_VIDEODRIVER"] = "dummy"
         pygame.display.init()

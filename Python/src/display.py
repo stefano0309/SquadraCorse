@@ -6,7 +6,6 @@ def display(rc: RadioController, steer_deg: float, servo_offset: float, steering
             accel: float, brake: float,
             speed_sel: int, reverse: bool, actual_rate: float, log_lines: list, max_speeds: int):
     mod_str = {
-        "LORA": f"LoRa 433 MHz  |  TX Power: {rc.tx_power} dBm",
         "NRF24": "nRF24L01+ 2.4 GHz",
         "NONE": "** NESSUN MODULO RILEVATO **"
     }.get(rc.module, rc.module)

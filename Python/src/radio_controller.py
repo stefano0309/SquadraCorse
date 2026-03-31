@@ -7,10 +7,12 @@ import pathlib
 with open(pathlib.Path(__file__).parent / "config.json") as f:
     config = json.load(f)
 
-SERIAL_BAUD = config['SERIAL_BAUD']
-DEFAULT_SEND_RATE = config['DEFAULT_SEND_RATE']
-BINARY_MARKER = config['BINARY_MARKER']
-DEFAULT_TX_POWER = config['DEFAULT_TX_POWER']
+# ══════════════ CARICAMENTO CONFIGURAZIONE ══════════════
+SERIAL_BAUD = config['SERIAL_BAUD'] # Velocità del seriale
+DEFAULT_SEND_RATE = config['DEFAULT_SEND_RATE'] # Frequenza di invio dei pacchetti
+BINARY_MARKER = config['BINARY_MARKER'] # Bho roba strana che però serve
+DEFAULT_TX_POWER = config['DEFAULT_TX_POWER'] # !!! POTENZA TRASMISSIONE SOLO LORA
+
 
 from crc import crc16_ccitt
 

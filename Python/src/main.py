@@ -9,19 +9,33 @@ import pathlib
 with open(pathlib.Path(__file__).parent / "config.json") as f:
     config = json.load(f)
 
-SERIAL_BAUD = config['SERIAL_BAUD']
-MAX_SPEEDS = config['MAX_SPEEDS']
-DISPLAY_REFRESH_S = config['DISPLAY_REFRESH_S']
-SERVO_ZERO_OFFSET = config.get('SERVO_ZERO_OFFSET', 0)
-STEERING_MAX_ANGLE = config.get('STEERING_MAX_ANGLE', 90)
-WHEEL_RANGE_DEGREES = config.get('WHEEL_RANGE_DEGREES', 450)
 
-from utils import clear_once, get_axis_idx, get_axis_calibration, norm_pedal, norm_steer
-from mapping import load_mapping, save_mapping
-from radio_controller import RadioController
-from controller_discovery import scopri_assi, scopri_pulsanti
-from display import display
-from menu import run_menu
+# ══════════════ CARICAMENTO CONFIGURAZIONE ══════════════
+#  Per aggiornare questi parametri modificare config.json
+
+# Connessione Seriale al Trasmettitore
+TX_PORT_WINDOWS = config['TX_PORT_WINDOWS'] # Porta Utilizata in caso di Sistema Windows
+TX_PORT_LINUX = config['TX_PORT_LINUX'] # Porta Utilizzata in caso di Sistema Linux
+SERIAL_BAUD = config['SERIAL_BAUD'] # Velocità della Comunicazione
+
+# Parametri Guida
+MAX_SPEEDS = config['MAX_SPEEDS'] # Numero massimo di velocità scalabili (da 1 a 16)
+SERVO_ZERO_OFFSET = config.get('SERVO_ZERO_OFFSET', 0) # Definisce l'offset necessario per calibrare il servo
+STEERING_MAX_ANGLE = config.get('STEERING_MAX_ANGLE', 90) # Definisce l'angolo massimo di rotazione del volante
+WHEEL_RANGE_DEGREES = config.get('WHEEL_RANGE_DEGREES', 450) # Definisce l'angolo massimo di rotazione del servo
+
+# Opzioni display
+DISPLAY_REFRESH_S = config['DISPLAY_REFRESH_S'] # Definisce quante volte al secondo ricaricare lo schermo
+
+
+
+# ══════════════ Importazione moduli esterni ══════════════
+from utils import clear_once, get_axis_idx, get_axis_calibration, norm_pedal, norm_steer # Funzioni per la lettura degli assi
+from mapping import load_mapping, save_mapping # Funzioni per caricare e salvare la mappatura
+from radio_controller import RadioController # Classe per l'invio dei dati al TX
+from controller_discovery import scopri_assi, scopri_pulsanti # Funzioni mappare la mappatura
+from display import display # Funzione per implementare l'interfaccia grafica
+from menu import run_menu # Funzione che apre il menù delle impostazioni
 from pygame_init import init_pygame
 
 # ══════════════ MAIN ══════════════
@@ -33,31 +47,36 @@ def _sigint_handler(signum, frame):
 
 def main():
     global _quit_flag
-    parser = argparse.ArgumentParser(description="TX Squadra Corse – solo terminale")
-    parser.add_argument("port", nargs="?", default="/dev/ttyUSB0" if sys.platform != "win32" else "COM9")
+
+    # Imposta la porta seriale
+    parser = argparse.ArgumentParser()
+    parser.add_argument("port", nargs="?", default=TX_PORT_LINUX if sys.platform != "win32" else TX_PORT_WINDOWS)
     args = parser.parse_args()
 
+    # Inizializza pygame
     init_pygame()
     signal.signal(signal.SIGINT, _sigint_handler)
+
+    # Se non c'è nessun controller/volante collegato esce
     if pygame.joystick.get_count() == 0:
         print("  Nessun controller trovato!")
         return
     js = pygame.joystick.Joystick(0)
 
-    # Mapping
-    mapping = load_mapping()
-    need_remap = True
+    # ══════════════ Mappatura ══════════════
+    mapping = load_mapping() # Carica la mappatura precedente da mapping.json
+    need_remap = True # Inizia presumendo che sia necessario rimappare
+
     if mapping and mapping.get("controller"):
-        # Forza rimappatura se il mapping usa il vecchio formato (int senza polarity)
-        old_format = any(isinstance(v, int) for v in mapping.get("assi", {}).values())
-        if old_format:
-            print("\n  Mappatura vecchio formato rilevata — rimappatura obbligatoria per calibrazione assi.")
-        else:
-            file_ctrl = mapping.get("controller")
-            js_ctrl = js.get_name()
-            file_ctrl_norm = file_ctrl.lower().strip()
-            js_ctrl_norm = js_ctrl.lower().strip()
+            file_ctrl = mapping.get("controller") # Ottiene il nome del controller/volante utilizzato la scorsa volta
+            js_ctrl = js.get_name() # Ottiene il nome del controller/volante collegato
+            file_ctrl_norm = file_ctrl.lower().strip() # Normalizza il nome del controller precedentemente mappato
+            js_ctrl_norm = js_ctrl.lower().strip() # Normalizza il nome del controller collegato
+
+            # Verifica che il controller utilizzato precedentemente non sia cambiato
             same = (file_ctrl_norm == js_ctrl_norm or file_ctrl_norm in js_ctrl_norm or js_ctrl_norm in file_ctrl_norm)
+            
+            # Se il controller non è cambiato chiede conferma all'utente e carica la mappatura precedente
             if same:
                 print(f"\n  Mappatura trovata per controller: {file_ctrl}")
                 print("  Premi un pulsante qualsiasi per confermare o attendi 5 s per rimappare...")
@@ -76,13 +95,12 @@ def main():
                         break
                     time.sleep(0.02)
                 if confermato:
-                    need_remap = False
+                    need_remap = False  # Se la mappatura viene confermata non è necessario rifarla (skippa lo step dopo)
                     print("  Mappatura confermata.")
                 else:
-                    print("  Rimappatura...")
-            else:
-                print(f"\n  Mappatura presente in mapping.json per '{file_ctrl}', ma controller connesso è '{js_ctrl}'. Rimappatura forzata.")
-
+                    print("  Rimappatura...")   
+    
+    # Se è necessario rimappare chiama la funzione apposita in mapping.py
     if need_remap:
         assi = scopri_assi(js)
         pulsanti = scopri_pulsanti(js)
@@ -90,41 +108,47 @@ def main():
         save_mapping(mapping)
         print("  Mappatura salvata in mapping.json")
 
-    # ── Pulizia post-mappatura ──
-    # Attendi che tutti i pulsanti siano rilasciati
+    # Attende che tutti i pulsanti vengano rilasciati
     t0 = time.time()
     while time.time() - t0 < 1.0:
         pygame.event.pump()
         if not any(js.get_button(i) for i in range(js.get_numbuttons())):
             break
         time.sleep(0.02)
-    # Svuota la coda eventi e resetta il flag quit (potrebbe essere stato alterato durante la mappatura)
-    pygame.event.clear()
-    time.sleep(0.2)
-    pygame.event.clear()
-    _quit_flag = False
 
     assi = mapping["assi"]
     pulsanti = mapping["pulsanti"]
     if "STERZO" not in assi:
         print("\n  ERRORE: asse sterzo non mappato.")
         return
+    if "ACCELERATORE" not in assi:
+        print("\n  ERRORE: asse accelleratore non mappato.")
+        return
+    if "FRENO" not in assi:
+        print("\n  ERRORE: asse freno non mappato.")
+        return
 
-    # Connessione
+
+
+    # ══════════════ Connessione al Trasmettitore ══════════════
     rc = RadioController()
     print(f"\n  Connessione a {args.port} ...")
+    
+    # Se il trasmettitore è collegato avvia fa un handshake, altrimenti va in sola visualizzazione
     if rc.connect(args.port, SERIAL_BAUD) and rc.handshake():
-        print(f"  Handshake OK → modulo: {rc.module}")
+        print(f"  Handshake OK → modulo: {rc.module}") 
     else:
         print("  Seriale non disponibile – solo visualizzazione.")
 
     # Stato
     max_speeds = MAX_SPEEDS
-    speed_sel = 0
-    reverse = False
+    speed_sel = 0  # Velocità attualmente selezionata (in range tra 1 e MAX_SPEEDS)
+    reverse = False # Retro abilitata, vero o falso
     commands = 0
     log_lines: list[str] = []
-    cfg = {"tx_power": rc.tx_power, "send_rate": rc.send_rate, "max_speeds": max_speeds, "serial_port": args.port,
+
+    # dizionario Configuration: contiene stato hardware, parametri, calibrazione e connessione
+    cfg = {"send_rate": rc.send_rate, "max_speeds": max_speeds, "serial_port": args.port,
            "SERVO_ZERO_OFFSET": SERVO_ZERO_OFFSET, "STEERING_MAX_ANGLE": STEERING_MAX_ANGLE,
            "WHEEL_RANGE_DEGREES": WHEEL_RANGE_DEGREES}
 
@@ -147,20 +171,13 @@ def main():
     clear_once()
     sys.stdout.write("\033[?25l")
 
-    # Indice pulsante retro per polling momentaneo
-    retro_btn_idx = pulsanti.get("RETRO")
 
-    # inizializza valori assi per evitare variabili non definite nel display
-    volante = 0.0
-    accel_norm = 0.0
-    freno_norm = 0.0
-    steer_deg = 0.0
-
+    
     try:
         while not _quit_flag:
             pygame.event.pump()
 
-            # Pulsanti: registra DOWN e attiva azione al rilascio (durata minima)
+            # Pulsanti: registra DOWN e attiva azione al rilascio (durata minima), bho sta roba è mistica ma funziona
             for ev in pygame.event.get():
                 if ev.type == pygame.JOYBUTTONDOWN:
                     for nome, idx in pulsanti.items():
@@ -224,8 +241,7 @@ def main():
                     rate_timer = now
 
 
-                
-
+                # Lettura valori grezzi degli assi
                 volante_raw = js.get_axis(get_axis_idx(assi, "STERZO"))
                 accel_raw = js.get_axis(get_axis_idx(assi, "ACCELERATORE"))
                 freno_raw = js.get_axis(get_axis_idx(assi, "FRENO"))
@@ -253,7 +269,7 @@ def main():
                 # Freno: soglia 10% per attivazione
                 brake_pressed = freno_norm > 0.10
 
-                # Se il freno è premuto, azzera la pressione gas
+                # Se il freno è premuto, l'accelleratore va a 0
                 if brake_pressed:
                     accel_norm = 0.0
 

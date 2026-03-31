@@ -6,7 +6,6 @@ from utils import save_config, get_axis_idx
 
 # ══════════════ MENU IMPOSTAZIONI ══════════════
 MENU_ITEMS = [
-    {"label": "TX Power (dBm)",     "key": "tx_power",  "type": "slider", "min": -5,  "max": 20,  "step": 1},
     {"label": "Send Rate (Hz)",     "key": "send_rate", "type": "slider", "min": 1,   "max": 100, "step": 1},
     {"label": "Livelli Velocità",   "key": "max_speeds","type": "slider", "min": 0,   "max": 16,  "step": 1},
     {"label": "Angolo Max Sterzo",  "key": "STEERING_MAX_ANGLE", "type": "slider", "min": 10, "max": 180, "step": 5},
@@ -15,8 +14,8 @@ MENU_ITEMS = [
     {"label": "Porta Seriale",      "key": "serial_port", "type": "info"},
     {"label": "Rimappa Controller", "key": "remap",       "type": "action"},
     {"label": "Refresh Status TX",  "key": "refresh",     "type": "action"},
-    {"label": "Chiudi Programma",   "key": "quit",        "type": "action"},
     {"label": "Esci dal menu",      "key": "exit",        "type": "action"},
+    {"label": "Chiudi Programma",   "key": "quit",        "type": "action"},
 ]
 
 def display_menu(cursor: int, rc: RadioController, cfg: dict, editing: bool = False):
@@ -330,8 +329,6 @@ def run_menu(js, pulsanti: dict, assi: dict, rc: RadioController, cfg: dict) -> 
         new = max(mn, min(mx, cur + delta * step))
         if new == cur: return False
         cfg[key] = new
-        if key == "tx_power" and rc.connected:
-            rc.set_tx_power(new)
         if key == "send_rate" and rc.connected:
             rc.set_send_rate(new)
         if key in CONFIG_BACKED_KEYS:
