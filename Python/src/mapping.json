@@ -20,7 +20,7 @@
   "pulsanti": {
     "VEL_SU": 3,
     "VEL_GIU": 0,
-    "RETRO": 1,
+    "RETRO": 4,
     "MENU": 7
   }
 }

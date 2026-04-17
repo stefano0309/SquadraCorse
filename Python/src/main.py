@@ -27,7 +27,7 @@ WHEEL_RANGE_DEGREES = config.get('WHEEL_RANGE_DEGREES', 450) # Definisce l'angol
 # Opzioni display
 DISPLAY_REFRESH_S = config['DISPLAY_REFRESH_S'] # Definisce quante volte al secondo ricaricare lo schermo
 
-
+INVERT_STEER = False
 
 # ══════════════ Importazione moduli esterni ══════════════
 from utils import clear_once, get_axis_idx, get_axis_calibration, norm_pedal, norm_steer # Funzioni per la lettura degli assi
@@ -278,9 +278,13 @@ def main():
                 # Conversione sterzo: asse → gradi → clamp a ±STEERING_MAX → applica offset → byte
                 wheel_deg = volante * (wheel_range_degrees / 2)
                 steer_deg = max(-steering_max_angle, min(steering_max_angle, wheel_deg))
+
+                if INVERT_STEER:
+                    steer_deg = -steer_deg
+
                 output_deg = steer_deg + servo_zero_offset
-                # Inversione sterzo
-                steer_byte = int(((-output_deg + steering_max_angle) / (2 * steering_max_angle)) * 255)
+
+                steer_byte = int(((output_deg + steering_max_angle) / (2 * steering_max_angle)) * 255)
                 steer_byte = max(0, min(255, steer_byte))
 
                 if rc.connected:

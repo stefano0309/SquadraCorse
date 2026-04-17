@@ -58,12 +58,13 @@ const int SERVO_CENTER = 90;
 #define PROBE_INTERVAL_MS   2000
 #define PACKET_SIZE           9
 #define UPDATE_INTERVAL_MS   20        // aggiornamento motore/servo (50 Hz)
-#define NRF_CHANNEL          73        // Canale NRF24 – Macchina 1
+#define NRF_CHANNEL          73        // Canale NRF24 – Macchina 1 // Da cambiare in base al tipo di macchina
 // ── Token identificativo macchina ──
 #define TOKEN_0 'V'
 #define TOKEN_1 'A'
 #define TOKEN_2 'L'
-#define TOKEN_3 '1'
+#define TOKEN_3 '1' // Da cambiare in base al tipo di macchina
+
 // ── Rampe motore (unità PWM per tick di UPDATE_INTERVAL_MS) ──
 #define ACCEL_RATE          2.5f   // accelerazione verso target (~2s per 0→max)
 #define DECEL_COAST         1.2f   // rilascio acceleratore – coast molto dolce (~4s)
